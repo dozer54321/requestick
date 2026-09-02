@@ -1,0 +1,101 @@
+REQUESTICK — run it on your own Ubuntu server
+============================================
+
+This pack is the sales-desk board only. Dealer tickets, part numbers, and
+personal cells stay on a machine you control. Nothing is hosted on Grok.
+
+Premade Docker (if Docker is already installed)
+-----------------------------------------------
+  chmod +x start.sh backup.sh
+  ./start.sh requestick.yourcompany.com
+
+Read DOCKER.txt for the Windows command, a prebuilt image, and GHCR pull.
+
+What you buy
+------------
+1. A cheap Ubuntu 24.04 cloud server, 2 GB RAM or more.
+   Hetzner CX22 (~$4–5/month) is plenty. DigitalOcean / Vultr / Linode
+   $6–12 plans work if they have at least 2 GB RAM.
+2. A cheap domain, about $10/year (Porkbun, Namecheap, Cloudflare).
+   A subdomain is enough, e.g. requestick.yourcompany.com
+   Login will not work on a bare IP — the desk needs a real name with HTTPS.
+
+Shared hosting (cPanel / PHP / "$4 unlimited websites")
+-------------------------------------------------------
+This is a Node.js app with Postgres. Classic shared hosting cannot run it.
+A cheap VPS + a cheap domain is the right cheap option. You do not need
+a Windows box, IIS, or a network share.
+
+What you do not need
+--------------------
+Windows admin rights, a network drive, VPN, IIS, or anyone installing
+software on the sales PCs. Chrome or Edge is enough.
+
+Setup (no Docker yet)
+---------------------
+Easiest: use the one-file installer (same app as this folder):
+
+      sudo bash requestick-linux-setup.sh requestick.yourcompany.com
+
+That installs Docker into the machine and the app into /opt/requestick.
+Or, from this unpacked folder:
+
+1. Create the Ubuntu server. Note the public IP.
+2. At your domain registrar, add an A record:
+      requestick.yourcompany.com  ->  (the server IP)
+3. Copy this whole folder onto the server (WinSCP, the host's file
+   manager, or from PowerShell:  scp -r requestick-linux root@YOUR.IP:/opt/requestick).
+4. SSH in (the host's web console works too) and run:
+
+      cd /opt/requestick
+      sudo chmod +x install.sh backup.sh start.sh
+      sudo ./install.sh requestick.yourcompany.com
+
+5. Wait about a minute, then open https://requestick.yourcompany.com
+6. First person through Sign in + station card is the admin.
+7. Open Admin (shield on the board):
+      People  — add accounts, approve logins, edit desks, set admin
+      Look    — company name, logo, colors (this shop's face)
+      Central — Business Central API, then open tickets by salesperson
+
+Daily use is the same as the demo: post a request, On it / Filled, Call the
+Ring Central ext, Text the cell. Leave the tab open for Windows alerts.
+Admins can edit, hide, or permanently remove anyone's request. Hidden items
+sit under the Hidden filter until an admin Removes them. If Central is
+connected, BC tickets shows who still has items on an open order or quote.
+
+Selling Requestick to other shops
+---------------------------
+Each shop runs their own copy (their VPS, their domain, their database).
+Do not put two shops on one install — tickets and cell numbers would mix.
+The shop admin sets name, mark, and colors under Admin → Look, and hooks
+their own Business Central under Admin → Central.
+
+Business Central
+----------------
+SaaS: Entra ID app, client credentials, Application permission
+API.Read.All only on Dynamics 365 Business Central. Grant admin consent.
+Do not add API.ReadWrite.All. Then Tenant ID + client ID + secret +
+environment. Test & list companies, pick the company, Save.
+
+On-prem: API base URL (…/api/v2.0) and a BC user with a read-only
+permission set.
+
+Backups
+-------
+   sudo ./backup.sh
+Writes a dated dump under ./backups/. Copy those files off the server
+(OneDrive, another disk). A nightly cron is:
+
+   15 2 * * * /opt/requestick/backup.sh
+
+Updates
+-------
+Replace the files in this folder with a newer pack (keep mesh.env — it
+holds the database password and sign-in secret), then:
+
+   ./start.sh requestick.yourcompany.com
+
+The one-file installer keeps mesh.env if you run it again on the same
+server. Do not delete the Docker volume named mesh_pgdata. That is the
+database.

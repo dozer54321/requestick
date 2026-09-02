@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #efe8dc;
+  --color-bg-deep: #e4d9c8;
+  --color-surface: #f7f1e7;
+  --color-surface-2: #fffdf8;
+  --color-ink: #1c1917;
+  --color-ink-soft: #4a433c;
+  --color-muted: #6f675e;
+  --color-faint: #8a8278;
+  --color-line: #d4c8b6;
+  --color-line-strong: #b9ab96;
+  --color-primary: #1c1917;
+  --color-primary-fg: #f7f1e7;
+  --color-steel: #3d4a52;
+  --color-hot: #8f2d2d;
+  --color-hot-bg: #f3ddd6;
+  --color-today: #7a5b24;
+  --color-today-bg: #f0e4c8;
+  --color-later: #3f5348;
+  --color-later-bg: #dce8df;
+  --color-filled: #2c5a42;
+  --color-claimed: #2f4d63;
+  --color-claimed-bg: #d7e4ee;
+  --color-ring: #1c1917;
+
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  --shadow-ticket:
+    0 0 0 1px color-mix(in oklab, var(--color-ink) 8%, transparent),
+    0 1px 2px color-mix(in oklab, var(--color-ink) 6%, transparent),
+    0 10px 24px -16px color-mix(in oklab, var(--color-ink) 35%, transparent);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--color-bg);
+    color: var(--color-ink);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background:
+      radial-gradient(1200px 500px at 50% -10%, color-mix(in oklab, var(--color-surface-2) 70%, transparent), transparent 70%),
+      var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: var(--color-ink);
+    color: var(--color-primary-fg);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes mesh-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes mesh-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mesh-rise {
+  animation: mesh-rise 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}

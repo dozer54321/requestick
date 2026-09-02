@@ -1,0 +1,5 @@
+.git
+*.env
+mesh.env
+backups
+node_modules

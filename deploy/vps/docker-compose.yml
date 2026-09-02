@@ -1,0 +1,86 @@
+name: mesh
+
+# Premade stack: Postgres + Requestick + Caddy (HTTPS).
+#   ./start.sh requestick.yourcompany.com
+# Optional prebuilt image (GitHub Release):
+#   REQUESTICK_IMAGE=ghcr.io/YOURORG/requestick:v1.0.0
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mesh
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: mesh
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mesh -d mesh"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - mesh
+
+  app:
+    image: ${REQUESTICK_IMAGE:-requestick:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    pull_policy: missing
+    restart: unless-stopped
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://mesh:${POSTGRES_PASSWORD}@db:5432/mesh
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: https://${MESH_DOMAIN}
+      HOST: 0.0.0.0
+      PORT: "3000"
+      NODE_ENV: production
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
+    networks:
+      - mesh
+    # Already have your own reverse proxy? Comment out the caddy service
+    # and uncomment this:
+    # ports:
+    #   - "127.0.0.1:3000:3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MESH_DOMAIN: ${MESH_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - mesh
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  mesh:

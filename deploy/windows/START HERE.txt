@@ -1,0 +1,36 @@
+REQUESTICK SETUP
+================
+
+This folder is for ONE machine that will host the board.
+Do not run this on sales PCs. Desks only open the website.
+
+Already have Docker Desktop running? (premade stack)
+
+  1. Point a name at this machine (example: requestick.yourcompany.com).
+     A bare IP will not work.
+  2. PowerShell:  .\start.ps1 requestick.yourcompany.com
+
+No Docker yet:
+
+  1. Point that same hostname at this machine
+  2. Right-click  install.bat  →  Run as administrator
+  3. Type that hostname when asked
+  4. Wait a minute, then open https://requestick.yourcompany.com
+  5. First person to Sign in and fill their desk card is the admin
+
+Need: Windows 10/11 or Server, Administrator, Docker Desktop
+      (install.bat can offer to install Docker Desktop via winget)
+
+If IIS is using the web ports, the installer stops it.
+
+After install
+  Admin → People   add / approve accounts
+  Admin → Look     company name, mark, colors
+  Admin → Central  Business Central, read-only
+
+Backup:   backup.ps1
+Stop:     uninstall.ps1   (keeps the database)
+
+Keep mesh.env private. That file is the password and sign-in secret.
+
+See DOCKER.txt for the compose stack, a prebuilt image, and GHCR.

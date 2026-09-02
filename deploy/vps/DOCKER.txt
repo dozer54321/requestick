@@ -1,0 +1,53 @@
+REQUESTICK — premade Docker
+==========================
+
+This is the whole product: Postgres, Requestick, and Caddy for HTTPS.
+Sales desks only open a browser. Do not run this on every PC.
+
+Need
+----
+- Docker (Docker Desktop, or docker + compose on Linux)
+- A hostname you own, e.g. requestick.yourcompany.com
+  Login needs HTTPS. A bare IP will not work.
+- DNS A record pointing that name at this machine
+
+Start
+-----
+Linux:
+
+  chmod +x start.sh backup.sh
+  ./start.sh requestick.yourcompany.com
+
+Windows (PowerShell, Docker Desktop running):
+
+  .\start.ps1 requestick.yourcompany.com
+
+That's it. First sign-in + desk card is the admin.
+
+No Docker yet?
+--------------
+Ubuntu:   sudo ./install.sh requestick.yourcompany.com
+          (installs Docker, then starts the same stack)
+
+Windows:  right-click install.bat → Run as administrator
+
+Prebuilt image (optional)
+-------------------------
+A GitHub Release can include requestick-image.tar.gz. Drop it next to
+docker-compose.yml (or one folder up). start.sh loads it and will not
+build anything.
+
+Or after you tag a release on GitHub:
+
+  docker login ghcr.io
+  # in mesh.env:
+  REQUESTICK_IMAGE=ghcr.io/YOURORG/requestick:v1.0.0
+  docker compose --env-file mesh.env up -d
+
+Already have a reverse proxy?
+-----------------------------
+In docker-compose.yml, comment out the caddy service and uncomment
+the app ports (127.0.0.1:3000). Point your proxy at that.
+
+Keep mesh.env private. Backup: ./backup.sh   (Windows: .\backup.ps1)
+Do not put two shops on one stack.

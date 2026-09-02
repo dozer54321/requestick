@@ -1,0 +1,14 @@
+.git
+node_modules
+artifacts
+screenshots
+.vercel
+.nitro
+.tanstack
+*.env
+mesh.env
+backups
+AGENTS.md
+.grok/skills
+.grok/references
+.grok/status

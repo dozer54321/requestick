@@ -1,0 +1,54 @@
+REQUESTICK — put it on GitHub
+=============================
+
+You do not need GitHub to install. The Docker pack already includes the
+built app. GitHub is how you keep the source, cut new releases, and
+publish a prebuilt image other shops can pull.
+
+1. On github.com, New repository → Private. Name it requestick.
+   Do not make it public: anyone with the URL could try to sign up.
+
+2. Extract requestick-source.tar.gz, then in that folder:
+
+      git init
+      git add .
+      git commit -m "Requestick"
+      git branch -M main
+      git remote add origin https://github.com/YOURORG/requestick.git
+      git push -u origin main
+
+3. Cut a release (GitHub Actions builds installers + the Docker image):
+
+      git tag v1.0.0
+      git push origin v1.0.0
+
+4. Open the repo → Releases. Download:
+
+      requestick-docker.tar.gz      premade compose stack (start here)
+      requestick-image.tar.gz       prebuilt app image (optional)
+      requestick-linux-setup.sh     one-file Linux installer
+      requestick-windows.zip        Windows server installer
+      requestick-source.tar.gz      source, if you want another copy
+
+The image is also pushed to GitHub Container Registry:
+
+      ghcr.io/YOURORG/requestick:v1.0.0
+
+A shop that can docker login to your private GHCR sets in mesh.env:
+
+      REQUESTICK_IMAGE=ghcr.io/YOURORG/requestick:v1.0.0
+
+then:  docker compose --env-file mesh.env up -d
+
+Sales never clones GitHub. They open the shop URL in Chrome or Edge.
+
+Giving another shop a copy: send them requestick-docker.tar.gz (and
+requestick-image.tar.gz if you have it) plus their own domain. They
+run their own server. Do not put two shops on one install.
+
+Rebuilding installers on your own machine (Node 22, Docker for the image):
+
+      npm ci
+      npm run pack:installers
+
+Packs land in artifacts/.

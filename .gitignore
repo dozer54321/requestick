@@ -1,0 +1,14 @@
+node_modules/
+.output/
+.vercel/
+.nitro/
+.tanstack/
+mesh.env
+*.env
+!deploy/**/*.env.example
+artifacts/
+backups/
+*.log
+.DS_Store
+screenshots/
+.node_modules.lock
