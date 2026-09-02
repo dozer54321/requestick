@@ -22,6 +22,7 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<MeshProfile | null>(null);
   const [removing, setRemoving] = useState<MeshProfile | null>(null);
+  const [handingOff, setHandingOff] = useState<MeshProfile | null>(null);
 
   const team = useQuery({
     queryKey: ["mesh-team"],
@@ -51,7 +52,8 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
         <p className="max-w-xl text-sm text-muted">
           Add people yourself, or approve anyone who requested a login. Nobody sees
           tickets or cells until they are approved. Owner and managers can delete
-          a login; the owner cannot be deleted. Requests they posted stay.
+          a login; the owner cannot be deleted. The owner can transfer
+          ownership to a manager. Requests they posted stay.
         </p>
         <Button onClick={() => setAddOpen(true)}>Add account</Button>
       </div>
@@ -71,6 +73,7 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
                 onAct={(action) => act.mutate({ userId: p.userId, action })}
                 onEdit={() => setEditing(p)}
                 onDelete={() => setRemoving(p)}
+                onTransfer={() => setHandingOff(p)}
               />
             ))}
           </Section>
@@ -85,6 +88,7 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
                 onAct={(action) => act.mutate({ userId: p.userId, action })}
                 onEdit={() => setEditing(p)}
                 onDelete={() => setRemoving(p)}
+                onTransfer={() => setHandingOff(p)}
               />
             ))}
           </Section>
@@ -100,6 +104,7 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
                   onAct={(action) => act.mutate({ userId: p.userId, action })}
                   onEdit={() => setEditing(p)}
                   onDelete={() => setRemoving(p)}
+                  onTransfer={() => setHandingOff(p)}
                 />
               ))}
             </Section>
@@ -158,6 +163,22 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
           toast("Account deleted");
         }}
       />
+
+      <TransferOwnerDialog
+        profile={handingOff}
+        onClose={() => setHandingOff(null)}
+        onConfirm={async () => {
+          if (!handingOff) return;
+          const rows = await setTeamAccess({
+            data: { userId: handingOff.userId, action: "transfer_owner" },
+          });
+          qc.setQueryData(["mesh-team"], rows);
+          await qc.invalidateQueries({ queryKey: ["mesh-profile"] });
+          await qc.invalidateQueries({ queryKey: ["mesh"] });
+          setHandingOff(null);
+          toast(`${handingOff.displayName} is now the owner. You are a manager.`);
+        }}
+      />
     </div>
   );
 }
@@ -191,6 +212,7 @@ function MemberRow({
   onAct,
   onEdit,
   onDelete,
+  onTransfer,
 }: {
   profile: MeshProfile;
   mine: boolean;
@@ -199,6 +221,7 @@ function MemberRow({
   onAct: (action: TeamAction) => void;
   onEdit: () => void;
   onDelete: () => void;
+  onTransfer: () => void;
 }) {
   const canDelete =
     !mine &&
@@ -273,6 +296,14 @@ function MemberRow({
             onClick={() => onAct("remove_manager")}
           >
             Remove manager
+          </Button>
+        ) : null}
+        {ownerView &&
+        profile.role === "manager" &&
+        profile.accessStatus === "approved" &&
+        !mine ? (
+          <Button size="sm" variant="outline" disabled={busy} onClick={onTransfer}>
+            Make owner
           </Button>
         ) : null}
         {canDelete ? (
@@ -503,6 +534,79 @@ function DeleteAccountDialog({
             {busy ? "Deleting…" : "Delete account"}
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TransferOwnerDialog({
+  profile,
+  onClose,
+  onConfirm,
+}: {
+  profile: MeshProfile | null;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [phrase, setPhrase] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setPhrase("");
+    setBusy(false);
+    setError("");
+  }, [profile?.userId]);
+
+  const ready = phrase.trim().toUpperCase() === "TRANSFER";
+
+  return (
+    <Dialog
+      open={Boolean(profile)}
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose();
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Make {profile?.displayName || "this manager"} the owner?</DialogTitle>
+          <DialogDescription>
+            You become a manager. They get Updates, can delete managers, and can
+            transfer ownership again. Type TRANSFER to confirm.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={async (e: FormEvent) => {
+            e.preventDefault();
+            if (!ready || busy) return;
+            setBusy(true);
+            setError("");
+            try {
+              await onConfirm();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Could not transfer.");
+              setBusy(false);
+            }
+          }}
+        >
+          <Input
+            value={phrase}
+            onChange={(e) => setPhrase(e.target.value)}
+            placeholder="TRANSFER"
+            autoComplete="off"
+            aria-label="Type TRANSFER to confirm"
+          />
+          {error ? <p className="text-sm text-hot">{error}</p> : null}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="hot" disabled={!ready || busy}>
+              {busy ? "Transferring…" : "Transfer ownership"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -40,7 +40,8 @@ Sales use Chrome or Edge. Nothing is installed on the desks.
 ## Admin
 
 1. **People** — add accounts or approve sign-ups. The first login is the
-   **owner**. The owner can make **managers**. Owner and managers can
+   **owner**. The owner can make **managers**, and can **transfer ownership**
+   to a manager (type `TRANSFER` to confirm). Owner and managers can
    **delete** a login (the owner cannot be deleted; managers can only be
    deleted by the owner). Requests they posted stay on the board.
 2. **Look** — company name, mark, colors

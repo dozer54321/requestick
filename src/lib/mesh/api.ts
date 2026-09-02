@@ -698,7 +698,7 @@ export const setTeamAccess = createServerFn({ method: "POST" })
     const userId = cleanText(input.userId, 80);
     const action = String(input.action ?? "") as TeamAction;
     if (!userId) throw new Error("Missing teammate.");
-    if (!["approve", "deny", "make_manager", "remove_manager"].includes(action)) {
+    if (!["approve", "deny", "make_manager", "remove_manager", "transfer_owner"].includes(action)) {
       throw new Error("Invalid action.");
     }
     return { userId, action };
@@ -708,6 +708,31 @@ export const setTeamAccess = createServerFn({ method: "POST" })
     const actor = await requireStaff(sql, context.userId);
     const target = await loadProfile(sql, data.userId);
     if (!target) throw new Error("No such account.");
+
+    if (data.action === "transfer_owner") {
+      if (!isOwner(actor.role)) throw new Error("Only the owner can transfer ownership.");
+      if (data.userId === context.userId) throw new Error("You already own this install.");
+      if (target.role !== "manager" || target.accessStatus !== "approved") {
+        throw new Error("Ownership can only move to an approved manager.");
+      }
+      await sql`
+        update mesh_profiles
+        set
+          role = case
+            when user_id = ${data.userId} then 'owner'
+            when user_id = ${context.userId} then 'manager'
+            else role
+          end,
+          access_status = case
+            when user_id = ${data.userId} then 'approved'
+            else access_status
+          end,
+          updated_at = now()
+        where user_id in (${data.userId}, ${context.userId})
+      `;
+      return listProfiles(sql);
+    }
+
     if (target.role === "owner" && data.userId !== context.userId) {
       throw new Error("The owner cannot be changed from here.");
     }
