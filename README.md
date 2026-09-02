@@ -25,55 +25,28 @@ the tab open for Windows alerts. Admins **Hide** a request off the board, or
 Business Central is **read-only** (`API.Read.All` only). Requestick never writes
 back to BC.
 
-## Install on an Ubuntu VPS (one paste)
+## Install (Ubuntu VPS)
 
 Point DNS first: A record `requestick.yourcompany.com` → this server’s IP.
 Login needs a real hostname, not a bare IP.
 
-Make a GitHub token that can read this private repo:
-[github.com/settings/tokens](https://github.com/settings/tokens)
-(classic: `repo`, or fine-grained: this repo, **Contents: Read**).
-
-SSH into the VPS and paste this **one** block. It asks for the token and the
-hostname, then downloads and installs.
+SSH in and paste **this one line** (change the hostname):
 
 ```bash
-sudo bash <<'EOF'
-set -euo pipefail
-apt-get update -y
-apt-get install -y curl ca-certificates python3
-read -s -p "GitHub token: " GH_TOKEN < /dev/tty; echo
-read -p "Hostname (example: requestick.yourcompany.com): " HOST < /dev/tty
-HOST="$(echo "$HOST" | tr -d '[:space:]')"
-if [ -z "$HOST" ]; then echo "Need a hostname."; exit 1; fi
-ASSET=$(curl -fsSL \
-  -H "Authorization: Bearer $GH_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/dozer54321/requestick/releases/latest \
-  | python3 -c "import sys,json; a=[x for x in json.load(sys.stdin)['assets'] if x['name']=='requestick-linux-setup.sh']; print(a[0]['url'] if a else '')")
-if [ -z "$ASSET" ]; then echo "Download failed. Check the token."; exit 1; fi
-curl -fL --progress-bar \
-  -H "Authorization: Bearer $GH_TOKEN" \
-  -H "Accept: application/octet-stream" \
-  -o /tmp/requestick-install "$ASSET"
-unset GH_TOKEN
-chmod +x /tmp/requestick-install
-bash /tmp/requestick-install "$HOST"
-EOF
+curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.yourcompany.com
 ```
 
-Wait about a minute, then open `https://your-hostname`. First person through
-Sign in + desk card is the admin.
+No GitHub account. No token. Anyone can run it.
 
-If you already downloaded the pack from Releases:
+Wait about a minute, then open `https://requestick.yourcompany.com`. First
+person through Sign in + desk card is the admin. **That** is what keeps each
+shop company-only — not the installer.
+
+If you already have the unpacked folder:
 
 ```bash
-tar -xzf requestick-linux.tar.gz
-cd requestick-linux
 sudo ./install requestick.yourcompany.com
 ```
-
-`./install` asks for the hostname if you leave it off, and uses sudo if needed.
 
 ## After install
 
@@ -117,17 +90,18 @@ Drop `requestick-image.tar.gz` next to `docker-compose.yml` and start will
 
 ## GitHub
 
-This repo is **private**. Sales never clone it — they only open the shop URL.
+Repo is public so anyone can install. Each shop’s **board** is still locked:
+first user is admin, everyone else waits for approval.
 
-Releases (Actions, on a `v*` tag) attach:
+Releases attach:
 
-- `requestick-linux-setup.sh` — one-file installer (what the paste above uses)
+- `requestick-linux-setup.sh` — what the one-liner above uses
 - `requestick-linux.tar.gz` — same pack as a folder (`sudo ./install`)
 - `requestick-docker.tar.gz` / `requestick-image.tar.gz`
 - `requestick-windows.zip`
 - `requestick-source.tar.gz`
 
-To cut a new pack: `git tag v1.0.2 && git push origin v1.0.2`
+To cut a new pack: `git tag v1.0.3 && git push origin v1.0.3`
 
 ## Windows installer (server only)
 

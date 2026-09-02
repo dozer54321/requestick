@@ -1,39 +1,13 @@
-REQUESTICK — one paste on an Ubuntu VPS
-=======================================
+REQUESTICK — one line on an Ubuntu VPS
+======================================
 
 Point DNS first:
   requestick.yourcompany.com  →  this server's public IP
 
-GitHub token (repo is private):
-  https://github.com/settings/tokens
-  Classic: repo     Fine-grained: this repo, Contents: Read
+Paste this ONE line (change the hostname). No token.
 
-Paste this ONE block in SSH. It asks for the token and the hostname.
-
-sudo bash <<'EOF'
-set -euo pipefail
-apt-get update -y
-apt-get install -y curl ca-certificates python3
-read -s -p "GitHub token: " GH_TOKEN < /dev/tty; echo
-read -p "Hostname (example: requestick.yourcompany.com): " HOST < /dev/tty
-HOST="$(echo "$HOST" | tr -d '[:space:]')"
-if [ -z "$HOST" ]; then echo "Need a hostname."; exit 1; fi
-ASSET=$(curl -fsSL \
-  -H "Authorization: Bearer $GH_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/dozer54321/requestick/releases/latest \
-  | python3 -c "import sys,json; a=[x for x in json.load(sys.stdin)['assets'] if x['name']=='requestick-linux-setup.sh']; print(a[0]['url'] if a else '')")
-if [ -z "$ASSET" ]; then echo "Download failed. Check the token."; exit 1; fi
-curl -fL --progress-bar \
-  -H "Authorization: Bearer $GH_TOKEN" \
-  -H "Accept: application/octet-stream" \
-  -o /tmp/requestick-install "$ASSET"
-unset GH_TOKEN
-chmod +x /tmp/requestick-install
-bash /tmp/requestick-install "$HOST"
-EOF
+curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.yourcompany.com
 
 If you already have the unpacked folder:
 
-  cd requestick-linux
   sudo ./install requestick.yourcompany.com

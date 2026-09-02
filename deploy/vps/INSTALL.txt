@@ -1,31 +1,18 @@
 REQUESTICK — run it on your own Ubuntu server
 ============================================
 
-This pack is the sales-desk board only. Dealer tickets, part numbers, and
-personal cells stay on a machine you control.
+One line (change the hostname). No GitHub token.
 
-Fresh VPS
----------
-One paste: GitHub README (or PASTE.txt). It downloads and installs.
+  curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.yourcompany.com
 
-Already unpacked on the server
-------------------------------
-The only command:
+Already unpacked:
 
   sudo ./install requestick.yourcompany.com
 
-Need
-----
-Ubuntu 24.04, 2 GB RAM+, a hostname (not a bare IP), DNS A record pointing
-at this server.
+Need a hostname (not a bare IP) and a DNS A record pointing at this server.
 
-After it is up
---------------
 Open https://requestick.yourcompany.com
 First person through Sign in + desk card is the admin.
 
 Backup:  sudo ./backup.sh
 Keep mesh.env. Do not delete the Docker volume mesh_pgdata.
-
-Shared hosting (cPanel / PHP) cannot run Requestick.
-Each shop needs its own copy.
