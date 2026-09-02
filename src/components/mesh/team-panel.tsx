@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { createAccount, listTeam, setTeamAccess, updateMember } from "@/lib/mesh/api";
+import { createAccount, deleteMember, listTeam, setTeamAccess, updateMember } from "@/lib/mesh/api";
 import type { MeshProfile, MemberRole, TeamAction } from "@/lib/mesh/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<MeshProfile | null>(null);
+  const [removing, setRemoving] = useState<MeshProfile | null>(null);
 
   const team = useQuery({
     queryKey: ["mesh-team"],
@@ -49,8 +50,8 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-xl text-sm text-muted">
           Add people yourself, or approve anyone who requested a login. Nobody sees
-          tickets or cells until they are approved. The owner can make managers;
-          managers have the same desk rights and can be removed by the owner.
+          tickets or cells until they are approved. Owner and managers can delete
+          a login; the owner cannot be deleted. Requests they posted stay.
         </p>
         <Button onClick={() => setAddOpen(true)}>Add account</Button>
       </div>
@@ -69,6 +70,7 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
                 busy={act.isPending}
                 onAct={(action) => act.mutate({ userId: p.userId, action })}
                 onEdit={() => setEditing(p)}
+                onDelete={() => setRemoving(p)}
               />
             ))}
           </Section>
@@ -82,6 +84,7 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
                 busy={act.isPending}
                 onAct={(action) => act.mutate({ userId: p.userId, action })}
                 onEdit={() => setEditing(p)}
+                onDelete={() => setRemoving(p)}
               />
             ))}
           </Section>
@@ -96,6 +99,7 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
                   busy={act.isPending}
                   onAct={(action) => act.mutate({ userId: p.userId, action })}
                   onEdit={() => setEditing(p)}
+                  onDelete={() => setRemoving(p)}
                 />
               ))}
             </Section>
@@ -141,6 +145,19 @@ export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole
           await qc.invalidateQueries({ queryKey: ["mesh"] });
         }}
       />
+
+      <DeleteAccountDialog
+        profile={removing}
+        onClose={() => setRemoving(null)}
+        onConfirm={async () => {
+          if (!removing) return;
+          const rows = await deleteMember({ data: { userId: removing.userId } });
+          qc.setQueryData(["mesh-team"], rows);
+          await qc.invalidateQueries({ queryKey: ["mesh"] });
+          setRemoving(null);
+          toast("Account deleted");
+        }}
+      />
     </div>
   );
 }
@@ -173,6 +190,7 @@ function MemberRow({
   busy,
   onAct,
   onEdit,
+  onDelete,
 }: {
   profile: MeshProfile;
   mine: boolean;
@@ -180,7 +198,12 @@ function MemberRow({
   busy: boolean;
   onAct: (action: TeamAction) => void;
   onEdit: () => void;
+  onDelete: () => void;
 }) {
+  const canDelete =
+    !mine &&
+    profile.role !== "owner" &&
+    (profile.role !== "manager" || ownerView);
   return (
     <li className="rounded-lg bg-surface-2 p-3 shadow-[0_0_0_1px_var(--color-line)]">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -250,6 +273,11 @@ function MemberRow({
             onClick={() => onAct("remove_manager")}
           >
             Remove manager
+          </Button>
+        ) : null}
+        {canDelete ? (
+          <Button size="sm" variant="hot" disabled={busy} onClick={onDelete}>
+            Delete
           </Button>
         ) : null}
       </div>
@@ -420,6 +448,61 @@ function AccountForm({
             </Button>
           </div>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteAccountDialog({
+  profile,
+  onClose,
+  onConfirm,
+}: {
+  profile: MeshProfile | null;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  return (
+    <Dialog
+      open={Boolean(profile)}
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose();
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete {profile?.displayName || "this account"}?</DialogTitle>
+          <DialogDescription>
+            They lose this login immediately. Requests they posted stay on the
+            board. This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        {error ? <p className="text-sm text-hot">{error}</p> : null}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="hot"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError("");
+              try {
+                await onConfirm();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not delete.");
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "Deleting…" : "Delete account"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

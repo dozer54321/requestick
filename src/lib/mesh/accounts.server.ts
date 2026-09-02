@@ -60,6 +60,12 @@ export async function setCredentialPassword(
   );
 }
 
+export async function deleteAuthUser(sql: Sql, userId: string): Promise<void> {
+  await sql.query(`delete from "session" where "userId" = $1`, [userId]);
+  await sql.query(`delete from "account" where "userId" = $1`, [userId]);
+  await sql.query(`delete from "user" where id = $1`, [userId]);
+}
+
 export async function renameAuthUser(
   sql: Sql,
   userId: string,

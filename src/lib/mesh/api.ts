@@ -3,6 +3,7 @@ import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
 import {
   createCredentialUser,
+  deleteAuthUser,
   renameAuthUser,
   setCredentialPassword,
 } from "./accounts.server";
@@ -829,6 +830,35 @@ export const updateMember = createServerFn({ method: "POST" })
        where user_id = $5`,
       [data.displayName, data.email, data.extension, data.cell, data.userId],
     );
+    return listProfiles(sql);
+  });
+
+export const deleteMember = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((raw: unknown) => {
+    const userId = cleanText((raw as Record<string, unknown> | null)?.userId, 80);
+    if (!userId) throw new Error("Missing teammate.");
+    return { userId };
+  })
+  .handler(async ({ context, data }): Promise<MeshProfile[]> => {
+    const sql = await getSql();
+    const actor = await requireStaff(sql, context.userId);
+    if (data.userId === context.userId) {
+      throw new Error("You can't delete your own account.");
+    }
+    const target = await loadProfile(sql, data.userId);
+    if (!target) throw new Error("No such account.");
+    if (target.role === "owner") throw new Error("The owner cannot be deleted.");
+    if (target.role === "manager" && !isOwner(actor.role)) {
+      throw new Error("Only the owner can delete a manager.");
+    }
+    await sql`
+      update mesh_needs
+      set status = 'open', claimed_by = null, claimed_at = null, updated_at = now()
+      where claimed_by = ${data.userId} and status = 'claimed'
+    `;
+    await sql`delete from mesh_profiles where user_id = ${data.userId}`;
+    await deleteAuthUser(sql, data.userId);
     return listProfiles(sql);
   });
 
