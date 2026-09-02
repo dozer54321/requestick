@@ -4,19 +4,19 @@ REQUESTICK SETUP (Linux)
 This pack is for ONE Ubuntu server that will host the board.
 Sales desks only open the website. Do not install anything on the PCs.
 
-Already have Docker? (premade stack)
+Copy/paste from GitHub (fresh VPS):
+  See PASTE.txt  —  1. Download, then  2. Install
+  Same steps are at the top of README.md
 
-  chmod +x start.sh backup.sh
-  ./start.sh requestick.yourcompany.com
+Already have this folder on the server?
 
-No Docker yet:
+  Already have Docker? (premade stack)
+    chmod +x start.sh backup.sh
+    ./start.sh requestick.yourcompany.com
 
-  sudo chmod +x install.sh backup.sh start.sh
-  sudo ./install.sh requestick.yourcompany.com
-
-Or the one-file installer from a GitHub Release:
-
-  sudo bash requestick-linux-setup.sh requestick.yourcompany.com
+  No Docker yet:
+    sudo chmod +x install.sh backup.sh start.sh
+    sudo ./install.sh requestick.yourcompany.com
 
 Need
   Ubuntu 22.04 or 24.04, 2 GB RAM+
@@ -34,5 +34,3 @@ Keep mesh.env private. That file is the password and sign-in secret.
 
 Shared hosting (cPanel / PHP) cannot run Requestick.
 Each shop needs its own copy. Do not put two companies on one install.
-
-See DOCKER.txt for the compose stack, a prebuilt image, and GHCR.

@@ -1,0 +1,46 @@
+REQUESTICK — copy/paste on an Ubuntu VPS
+========================================
+
+Point DNS first:
+  requestick.yourcompany.com  →  this server's public IP
+
+This repo is private. Make a GitHub token that can read it:
+  https://github.com/settings/tokens
+  Classic: repo     Fine-grained: this repo, Contents: Read
+
+------------------------------------------------
+1. DOWNLOAD  (paste this whole block)
+------------------------------------------------
+
+sudo apt-get update -y
+sudo apt-get install -y curl ca-certificates python3
+read -s -p "GitHub token: " GH_TOKEN; echo
+ASSET=$(curl -fsSL \
+  -H "Authorization: Bearer $GH_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  https://api.github.com/repos/dozer54321/requestick/releases/latest \
+  | python3 -c "import sys,json; a=[x for x in json.load(sys.stdin)['assets'] if x['name']=='requestick-linux.tar.gz']; print(a[0]['url'] if a else '')")
+if [ -z "$ASSET" ]; then echo "Download failed. Check the token and that a release exists."; exit 1; fi
+curl -fL --progress-bar \
+  -H "Authorization: Bearer $GH_TOKEN" \
+  -H "Accept: application/octet-stream" \
+  -o requestick-linux.tar.gz "$ASSET"
+unset GH_TOKEN
+ls -lh requestick-linux.tar.gz
+
+Wait until ls prints a size. Token is not stored on the server.
+
+Already have requestick-linux.tar.gz from the Releases page? Skip this.
+
+------------------------------------------------
+2. INSTALL  (change the hostname, then paste)
+------------------------------------------------
+
+sudo mkdir -p /opt/requestick
+sudo tar -xzf requestick-linux.tar.gz -C /opt/requestick --strip-components=1
+cd /opt/requestick
+sudo chmod +x install.sh start.sh backup.sh
+sudo ./install.sh requestick.yourcompany.com
+
+Then open https://requestick.yourcompany.com
+First person through Sign in + desk card is the admin.

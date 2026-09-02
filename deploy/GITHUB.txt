@@ -22,11 +22,17 @@ publish a prebuilt image other shops can pull.
       git tag v1.0.0
       git push origin v1.0.0
 
-4. Open the repo → Releases. Download:
+4. Open the repo → README. Copy/paste install for a VPS is at the top:
+      1. Download
+      2. Install
+   Same text is in deploy/vps/PASTE.txt.
 
-      requestick-docker.tar.gz      premade compose stack (start here)
-      requestick-image.tar.gz       prebuilt app image (optional)
+5. Open the repo → Releases. Download:
+
+      requestick-linux.tar.gz       VPS pack (copy/paste in README)
       requestick-linux-setup.sh     one-file Linux installer
+      requestick-docker.tar.gz      premade compose stack
+      requestick-image.tar.gz       prebuilt app image (optional)
       requestick-windows.zip        Windows server installer
       requestick-source.tar.gz      source, if you want another copy
 
