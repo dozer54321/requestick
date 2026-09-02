@@ -109,6 +109,46 @@ function writeJob(job: JobState): void {
   }
 }
 
+async function hostComposeDir(): Promise<string> {
+  const dest = composeDir();
+  const ids: string[] = [];
+  try {
+    const { stdout } = await execFile("hostname", [], { timeout: 3000 });
+    if (stdout.trim()) ids.push(stdout.trim());
+  } catch {
+    /* ignore */
+  }
+  try {
+    const { stdout } = await execFile(
+      "docker",
+      ["ps", "-aq", "--filter", "name=mesh-app"],
+      { timeout: 8000 },
+    );
+    for (const id of stdout.split("\n").map((s) => s.trim()).filter(Boolean)) {
+      ids.push(id);
+    }
+  } catch {
+    /* ignore */
+  }
+  for (const id of ids) {
+    try {
+      const { stdout } = await execFile(
+        "docker",
+        ["inspect", "-f", "{{range .Mounts}}{{.Destination}}\t{{.Source}}\n{{end}}", id],
+        { timeout: 8000 },
+      );
+      for (const line of stdout.split("\n")) {
+        const [mountDest, source] = line.split("\t");
+        if (mountDest === dest && source?.trim()) return source.trim();
+      }
+    } catch {
+      /* next */
+    }
+  }
+  if (existsSync("/opt/requestick/docker-compose.yml")) return "/opt/requestick";
+  return dest;
+}
+
 async function dockerOk(): Promise<boolean> {
   if (!existsSync("/var/run/docker.sock")) return false;
   try {
@@ -283,8 +323,9 @@ export async function applyVersion(tag: string): Promise<UpdateStatus> {
 
     writeJob({ state: "restarting", targetTag: tag, error: null });
 
-    // Recreate the app from a *separate* helper container. If we run compose
-    // from inside the app, stopping the app kills the updater mid-swap.
+    // Bind-mount the *host* compose folder. Volume paths on docker.sock are
+    // host paths — /host/requestick only exists inside this container.
+    const hostDir = await hostComposeDir();
     await execFile("docker", ["rm", "-f", "mesh-updater"], { timeout: 15_000 }).catch(() => {});
     const { spawn } = await import("node:child_process");
     const child = spawn(
@@ -297,13 +338,20 @@ export async function applyVersion(tag: string): Promise<UpdateStatus> {
         "-v",
         "/var/run/docker.sock:/var/run/docker.sock",
         "-v",
-        `${dir}:/host/requestick`,
+        `${hostDir}:/work`,
         "-w",
-        "/host/requestick",
+        "/work",
+        "-e",
+        "DOCKER_CLI_PLUGIN_PATH=/usr/local/lib/docker/cli-plugins",
         `requestick:${tag}`,
         "sh",
         "-c",
-        "docker compose --env-file mesh.env up -d --no-deps --force-recreate --remove-orphans app",
+        [
+          "sleep 2",
+          "mkdir -p /work/backups /root/.docker/cli-plugins",
+          "cp -f /usr/local/lib/docker/cli-plugins/docker-compose /root/.docker/cli-plugins/docker-compose 2>/dev/null || true",
+          "docker compose --env-file mesh.env -p mesh up -d --no-deps --force-recreate --remove-orphans app > /work/backups/update.log 2>&1",
+        ].join(" && "),
       ],
       { detached: true, stdio: "ignore" },
     );
