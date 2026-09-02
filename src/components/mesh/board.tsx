@@ -647,7 +647,9 @@ function NeedCard({
               need.partNumber
             )}
           </h3>
-          <p className="mt-0.5 text-sm text-ink-soft">{need.description}</p>
+          {need.description ? (
+            <p className="mt-0.5 text-sm text-ink-soft">{need.description}</p>
+          ) : null}
           {need.notes ? <p className="mt-1 text-sm text-muted">{need.notes}</p> : null}
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -874,13 +876,14 @@ function PostNeedDialog({
         <DialogHeader>
           <DialogTitle>Post a need</DialogTitle>
           <DialogDescription>
-            The sales desk sees this immediately. Hot items toast everyone with alerts on.
+            Part number is the only required field. Ticket, description, qty, and
+            notes are optional.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
           <div className="grid gap-3 sm:grid-cols-[1.2fr_0.8fr]">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pn">Part number</Label>
+              <Label htmlFor="pn">Part number (required)</Label>
               <Input
                 id="pn"
                 value={partNumber}
@@ -898,7 +901,7 @@ function PostNeedDialog({
                 id="ticket"
                 value={ticketNumber}
                 onChange={(e) => setTicketNumber(e.target.value)}
-                placeholder="88421"
+                placeholder="Optional"
               />
             </div>
           </div>
@@ -918,8 +921,7 @@ function PostNeedDialog({
               id="desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Mil-spec buffer tube, black"
-              required
+              placeholder="Optional"
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-[5.5rem_1fr]">
@@ -981,7 +983,7 @@ function PostNeedDialog({
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={post.isPending}>
+            <Button type="submit" disabled={post.isPending || !finishPart(partNumber)}>
               {post.isPending ? "Posting…" : "Post request"}
             </Button>
           </div>
@@ -1085,7 +1087,6 @@ function EditNeedDialog({
               id={`edit-desc-${need.id}`}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              required
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-[5.5rem_1fr]">

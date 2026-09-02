@@ -1,11 +1,15 @@
 # Requestick
 
-Request ticket tracker for FFL inside sales. Post a part on an open dealer
-ticket, ping the desk, call Ring Central or text a cell. Admins approve logins,
-set branding, and can read open tickets from Business Central (read-only).
+Request ticket tracker for FFL inside sales. Post a part number on the board,
+ping the desk, call Ring Central or text a cell. Admins approve logins, set
+branding, and can look up open Business Central orders for that part
+(read-only).
 
-Each shop runs its own copy. First sign-in is the admin; everyone else waits
+Each shop runs its own copy. First sign-in is the owner; everyone else waits
 for approval. Do not put two shops on one install.
+
+A request only needs a **part number**. Ticket, description, qty, and notes
+are optional.
 
 ## Install
 

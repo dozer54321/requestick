@@ -154,7 +154,6 @@ function parseNeedDraft(input: Record<string, unknown>): NeedDraft {
   const partNumber = cleanPart(input.partNumber);
   const description = cleanText(input.description, 240);
   if (!partNumber) throw new Error("Part number is required.");
-  if (!description) throw new Error("Description is required.");
   const ticketNumber = cleanText(input.ticketNumber, 40);
   const qty = Math.max(1, Math.min(9999, Number(input.qty) || 1));
   const priority = NEED_PRIORITIES.includes(input.priority as NeedPriority)
