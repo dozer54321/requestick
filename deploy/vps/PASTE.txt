@@ -1,16 +1,14 @@
-REQUESTICK — one line on an Ubuntu VPS
-======================================
+REQUESTICK — Ubuntu VPS
+=======================
 
-Point DNS first:
-  requestick.yourcompany.com  →  this server's public IP
+Point DNS first. The command is curl (not url). Change the hostname.
 
-Paste this ONE line (change the hostname). No token.
+sudo apt-get update && sudo apt-get install -y curl
+curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.example.com
 
-curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.yourcompany.com
+Already unpacked:
 
-If you already have the unpacked folder:
+  sudo ./install requestick.example.com
 
-  sudo ./install requestick.yourcompany.com
-
-After install, Admin → Updates can pull a newer GitHub release or revert
-to an older one. Manual only. No token.
+After install: Admin → Updates to pull a newer GitHub release or revert.
+Manual only.

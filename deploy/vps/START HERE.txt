@@ -1,28 +1,25 @@
 REQUESTICK SETUP (Linux)
 ========================
 
-This pack is for ONE Ubuntu server that will host the board.
-Sales desks only open the website. Do not install anything on the PCs.
+One server. Sales desks only open the website.
 
-Fresh VPS — one line (change the hostname):
+Install (the command is curl, not url). Change the hostname:
 
-  curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.yourcompany.com
+  sudo apt-get update && sudo apt-get install -y curl
+  curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.example.com
 
-Already have this folder on the server:
+Already have this folder:
 
-  sudo ./install requestick.yourcompany.com
+  sudo ./install requestick.example.com
 
-Need
-  Ubuntu 22.04 or 24.04, 2 GB RAM+
-  A hostname you own. Login needs HTTPS, not a bare IP.
-  DNS A record:  requestick.yourcompany.com  →  this server
+DNS A record must point at this server. Login needs HTTPS, not a bare IP.
 
 First person to Sign in and fill their desk card is the admin.
 
   Admin → People    add / approve accounts
   Admin → Look      company name, mark, colors
   Admin → Central   Business Central, read-only
-  Admin → Updates   one-button GitHub update or revert (manual)
+  Admin → Updates   GitHub update or revert (manual)
 
 Backup:  sudo ./backup.sh
 Keep mesh.env private.
