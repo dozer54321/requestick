@@ -52,6 +52,8 @@ import {
   smsBody,
   smsHref,
   statusLabel,
+  stripPartEdges,
+  finishPart,
   telHref,
   timeLabel,
 } from "@/lib/mesh/format";
@@ -91,6 +93,7 @@ export function Board() {
   const [postOpen, setPostOpen] = useState(false);
   const [stationOpen, setStationOpen] = useState(false);
   const [bcOpen, setBcOpen] = useState(false);
+  const [bcPart, setBcPart] = useState("");
   const [announceOpen, setAnnounceOpen] = useState(false);
   const [wipeOpen, setWipeOpen] = useState(false);
   const [noticePerm, setNoticePerm] = useState<NotificationPermission>(
@@ -332,10 +335,17 @@ export function Board() {
                 </Button>
               </>
             ) : null}
-            {snapshot?.bcConnected ? (
-              <Button variant="outline" size="sm" onClick={() => setBcOpen(true)}>
+            {isStaff(mine.role) && snapshot?.bcConnected ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setBcPart("");
+                  setBcOpen(true);
+                }}
+              >
                 <ClipboardList className="size-3.5" />
-                <span className="hidden sm:inline">BC tickets</span>
+                <span className="hidden sm:inline">Part search</span>
               </Button>
             ) : null}
             <Button variant="ghost" size="icon-sm" onClick={() => setStationOpen(true)} aria-label="Desk settings">
@@ -441,6 +451,7 @@ export function Board() {
                         mineId={snapshot!.me}
                         myName={mine.displayName}
                         isAdmin={isStaff(mine.role)}
+                        canLookupBc={isStaff(mine.role) && Boolean(snapshot?.bcConnected)}
                       />
                     </li>
                   ))}
@@ -466,7 +477,11 @@ export function Board() {
         snapshot={snapshot}
       />
 
-      <BcTicketsDialog open={bcOpen} onOpenChange={setBcOpen} />
+      <BcTicketsDialog
+        open={bcOpen}
+        onOpenChange={setBcOpen}
+        partNumber={bcPart}
+      />
 
       <AnnounceDialog open={announceOpen} onOpenChange={setAnnounceOpen} />
       <WipeDialog open={wipeOpen} onOpenChange={setWipeOpen} />
@@ -565,15 +580,18 @@ function NeedCard({
   mineId,
   myName,
   isAdmin,
+  canLookupBc,
 }: {
   need: MeshNeed;
   snapshot: MeshSnapshot;
   mineId: string;
   myName: string;
   isAdmin: boolean;
+  canLookupBc: boolean;
 }) {
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
   const who = profileById(snapshot.profiles, need.createdBy);
   const claimer = profileById(snapshot.profiles, need.claimedBy);
   const filler = profileById(snapshot.profiles, need.filledBy);
@@ -616,7 +634,18 @@ function NeedCard({
             ) : null}
           </div>
           <h3 className="mt-2 font-mono text-[1.15rem] font-semibold tracking-tight text-ink">
-            {need.partNumber}
+            {canLookupBc ? (
+              <button
+                type="button"
+                className="underline decoration-line underline-offset-4 hover:text-ink-soft"
+                title="Open orders in Business Central"
+                onClick={() => setOrdersOpen(true)}
+              >
+                {need.partNumber}
+              </button>
+            ) : (
+              need.partNumber
+            )}
           </h3>
           <p className="mt-0.5 text-sm text-ink-soft">{need.description}</p>
           {need.notes ? <p className="mt-1 text-sm text-muted">{need.notes}</p> : null}
@@ -762,6 +791,13 @@ function NeedCard({
       </div>
 
       <EditNeedDialog need={need} open={editOpen} onOpenChange={setEditOpen} />
+      {canLookupBc ? (
+        <BcTicketsDialog
+          open={ordersOpen}
+          onOpenChange={setOrdersOpen}
+          partNumber={need.partNumber}
+        />
+      ) : null}
     </article>
   );
 }
@@ -841,7 +877,8 @@ function PostNeedDialog({
               <Input
                 id="pn"
                 value={partNumber}
-                onChange={(e) => setPartNumber(e.target.value)}
+                onChange={(e) => setPartNumber(stripPartEdges(e.target.value))}
+                onBlur={() => setPartNumber(finishPart(partNumber))}
                 placeholder="44192-BLK"
                 className="font-mono uppercase"
                 autoFocus
@@ -1003,7 +1040,7 @@ function EditNeedDialog({
         <DialogHeader>
           <DialogTitle>Edit need</DialogTitle>
           <DialogDescription>
-            Admins can correct a part number, ticket, or qty after it is posted.
+            Correct the part number, ticket, or qty after it is posted.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -1020,7 +1057,8 @@ function EditNeedDialog({
               <Input
                 id={`edit-pn-${need.id}`}
                 value={partNumber}
-                onChange={(e) => setPartNumber(e.target.value)}
+                onChange={(e) => setPartNumber(stripPartEdges(e.target.value))}
+                onBlur={() => setPartNumber(finishPart(partNumber))}
                 className="font-mono uppercase"
                 required
               />

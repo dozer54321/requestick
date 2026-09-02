@@ -134,6 +134,15 @@ export type BcLine = {
   outstanding: number;
 };
 
+export type BcPartOrder = {
+  orderId: string;
+  orderNumber: string;
+  status: string;
+  salespersonCode: string;
+  outstanding: number;
+  description: string;
+};
+
 export type BcTicket = {
   id: string;
   kind: "order" | "quote";

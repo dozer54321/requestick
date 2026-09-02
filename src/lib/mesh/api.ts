@@ -6,7 +6,7 @@ import {
   renameAuthUser,
   setCredentialPassword,
 } from "./accounts.server";
-import { listBcCompanies, listOpenBcTickets, secretsReady, type BcSecrets } from "./bc.server";
+import { listBcCompanies, searchOpenOrdersByPart, secretsReady, type BcSecrets } from "./bc.server";
 import { DEFAULT_PUBLIC_BRAND, isHexColor } from "./brand";
 import {
   loadSettings,
@@ -22,7 +22,7 @@ import type {
   AdminSettings,
   BcCompany,
   BcConnectionInput,
-  BcTicket,
+  BcPartOrder,
   Branding,
   MemberPatch,
   MemberRole,
@@ -137,9 +137,8 @@ function cleanText(value: unknown, max: number): string {
 
 function cleanPart(value: unknown): string {
   return String(value ?? "")
-    .trim()
+    .replace(/^\s+|\s+$/g, "")
     .toUpperCase()
-    .replace(/\s+/g, " ")
     .slice(0, 80);
 }
 
@@ -920,24 +919,23 @@ export const probeBc = createServerFn({ method: "POST" })
     return listBcCompanies(secrets);
   });
 
-export const listBcOpen = createServerFn({ method: "GET" })
+export const searchBcPart = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .handler(async ({ context }): Promise<BcTicket[]> => {
+  .validator((raw: unknown) => {
+    const input = (raw ?? {}) as Record<string, unknown>;
+    const partNumber = cleanPart(input.partNumber);
+    if (!partNumber) throw new Error("Part number is required.");
+    return { partNumber };
+  })
+  .handler(async ({ context, data }): Promise<BcPartOrder[]> => {
     const sql = await getSql();
-    await requireApproved(sql, context.userId);
+    await requireStaff(sql, context.userId);
     const settings = await loadSettings(sql);
     const secrets = mapSecrets(settings);
     if (!secretsReady(secrets) || !secrets.companyId) {
       throw new Error("Business Central is not connected.");
     }
-    const tickets = await sql<{ ticket_number: string }>`
-      select distinct ticket_number from mesh_needs
-      where ticket_number <> '' and status in ('open', 'claimed')
-    `;
-    return listOpenBcTickets(
-      secrets,
-      tickets.map((t) => t.ticket_number),
-    );
+    return searchOpenOrdersByPart(secrets, data.partNumber);
   });
 
 export const getUpdateStatus = createServerFn({ method: "GET" })

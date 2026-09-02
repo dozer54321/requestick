@@ -39,7 +39,11 @@ Sales use Chrome or Edge. Nothing is installed on the desks.
    **owner**. The owner can make **managers** (same desk rights; the owner can
    remove them).
 2. **Look** — company name, mark, colors
-3. **Central** — Business Central, read-only (`API.Read.All` only)
+3. **Central** — Business Central, read-only (`API.Read.All` only). Owner
+   and managers look up **open sales orders for one part number** (order
+   number, open status, salesperson code). The list scrolls. Requestick does
+   not dump the whole company. No ticket is required — Admin → Central, or
+   **Part search** on the board, or click a part number on a request.
 4. **Updates** — owner only. Install a GitHub release or revert. Manual only.
 
 On the board, owner and managers can **Announce** (toast + Windows alert to

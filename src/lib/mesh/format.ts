@@ -1,6 +1,14 @@
 import { format, formatDistanceToNowStrict, isToday, isYesterday, parseISO } from "date-fns";
 import type { MeshNeed, MeshProfile, NeedPriority, NeedStatus } from "./types";
 
+export function stripPartEdges(value: string): string {
+  return value.replace(/^\s+/, "");
+}
+
+export function finishPart(value: string): string {
+  return value.replace(/^\s+|\s+$/g, "").toUpperCase();
+}
+
 export function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
 }

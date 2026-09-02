@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MeshWordmark } from "./mark";
 import { PeopleAdmin } from "./team-panel";
-import { BcTicketsList } from "./bc-tickets";
+import { BcPartSearch } from "./bc-tickets";
 import { useBrand } from "./brand-context";
 import { UpdatesPanel } from "./updates-panel";
 import { isOwner, isStaff } from "@/lib/mesh/roles";
@@ -525,9 +525,10 @@ function CentralAdmin({
             </span>
           </div>
           <p className="mt-1 text-sm text-muted">
-            Requestick only reads open sales orders and quotes. It never creates,
-            changes, or deletes anything in BC. You still need an Entra / BC admin
-            to mint the app — a sales login is not enough.
+            Requestick only looks up open sales orders for a part number you
+            type. It never dumps the whole company, and it never writes back.
+            You still need an Entra / BC admin to mint the app — a sales login
+            is not enough.
           </p>
           <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-ink-soft">
             <li>
@@ -678,13 +679,15 @@ function CentralAdmin({
       </form>
 
       {initial?.connected ? (
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Open tickets</h2>
+        <div className="flex min-h-0 flex-col">
+          <h2 className="text-lg font-semibold tracking-tight">Part search</h2>
           <p className="mt-1 mb-4 text-sm text-muted">
-            Who still has items on an open order or quote. Pull a line onto the
-            board if the desk needs to chase a part.
+            No ticket needed. Type a part number to see open sales orders, status,
+            and salesperson code. The list scrolls if there are hundreds.
           </p>
-          <BcTicketsList />
+          <div className="flex max-h-[min(70vh,32rem)] min-h-[16rem] flex-col">
+            <BcPartSearch />
+          </div>
         </div>
       ) : null}
     </div>

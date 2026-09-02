@@ -1,4 +1,4 @@
-import type { BcCompany, BcLine, BcTicket } from "./types";
+import type { BcCompany, BcPartOrder } from "./types";
 
 export type BcSecrets = {
   tenantId: string;
@@ -20,6 +20,10 @@ function asString(value: unknown): string {
 function asNumber(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function odataQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
 function apiRoot(secrets: BcSecrets): string {
@@ -77,16 +81,16 @@ function authHeaders(accessToken: string | null, secrets: BcSecrets): HeadersIni
   return headers;
 }
 
-async function bcGet<T>(
+async function bcGetUrl<T>(
   secrets: BcSecrets,
   accessToken: string | null,
-  path: string,
+  url: string,
+  timeoutMs = 25000,
 ): Promise<T> {
-  const url = `${apiRoot(secrets)}${path.startsWith("/") ? path : `/${path}`}`;
   const res = await fetch(url, {
     method: "GET",
     headers: authHeaders(accessToken, secrets),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const json = (await res.json().catch(() => ({}))) as JsonRecord;
   if (!res.ok) {
@@ -94,13 +98,45 @@ async function bcGet<T>(
     const msg =
       asString(err?.message) ||
       asString(json.message) ||
-      `Business Central ${res.status} on ${path}`;
+      `Business Central ${res.status}`;
     throw new Error(msg);
   }
   return json as T;
 }
 
-type ODataList<T> = { value?: T[] };
+async function bcGet<T>(
+  secrets: BcSecrets,
+  accessToken: string | null,
+  path: string,
+  timeoutMs = 25000,
+): Promise<T> {
+  const url = `${apiRoot(secrets)}${path.startsWith("/") ? path : `/${path}`}`;
+  return bcGetUrl<T>(secrets, accessToken, url, timeoutMs);
+}
+
+type ODataList<T> = { value?: T[]; "@odata.nextLink"?: string };
+
+async function bcListAll(
+  secrets: BcSecrets,
+  accessToken: string | null,
+  path: string,
+  max = 800,
+): Promise<JsonRecord[]> {
+  const out: JsonRecord[] = [];
+  let next: string | null = path.startsWith("http")
+    ? path
+    : `${apiRoot(secrets)}${path.startsWith("/") ? path : `/${path}`}`;
+  while (next && out.length < max) {
+    const data: ODataList<JsonRecord> = await bcGetUrl<ODataList<JsonRecord>>(
+      secrets,
+      accessToken,
+      next,
+    );
+    out.push(...(data.value ?? []));
+    next = data["@odata.nextLink"] || null;
+  }
+  return out;
+}
 
 export async function listBcCompanies(secrets: BcSecrets): Promise<BcCompany[]> {
   const access = await token(secrets);
@@ -116,88 +152,134 @@ function companyPath(secrets: BcSecrets): string {
   return `/companies(${secrets.companyId})`;
 }
 
-function mapLine(row: JsonRecord): BcLine {
-  const qty = asNumber(row.quantity);
-  const outstanding = asNumber(
-    row.outstandingQuantity ?? row.quantityToShip ?? row.quantity,
-  );
-  return {
-    id: asString(row.id),
-    documentId: asString(row.documentId),
-    partNumber: asString(row.lineObjectNumber || row.number || row.description),
-    description: asString(row.description),
-    qty: qty || 1,
-    outstanding: outstanding || qty || 1,
-  };
+function linePart(row: JsonRecord): string {
+  return asString(row.lineObjectNumber || row.number).trim();
 }
 
-function mapTicket(
-  row: JsonRecord,
-  kind: "order" | "quote",
-  lines: BcLine[],
-  meshTickets: Set<string>,
-): BcTicket {
-  const number = asString(row.number);
-  return {
-    id: asString(row.id),
-    kind,
-    number,
-    customer: asString(row.customerName || row.sellToCustomerName),
-    salesperson: asString(row.salesperson || row.salespersonCode),
-    status: asString(row.status),
-    date: asString(row.orderDate || row.documentDate || row.postingDate),
-    lines: lines.filter((l) => l.documentId === asString(row.id) && l.partNumber),
-    onMesh: meshTickets.has(number.toLowerCase()),
-  };
+function lineOutstanding(row: JsonRecord): number {
+  const outstanding = asNumber(row.outstandingQuantity ?? row.quantityToShip);
+  if (outstanding > 0) return outstanding;
+  return asNumber(row.quantity);
 }
 
-export async function listOpenBcTickets(
+async function fetchLinesForPart(
   secrets: BcSecrets,
-  meshTicketNumbers: string[],
-): Promise<BcTicket[]> {
+  access: string | null,
+  root: string,
+  partNumber: string,
+): Promise<JsonRecord[]> {
+  const quoted = odataQuote(partNumber);
+  const select =
+    "$select=id,documentId,lineObjectNumber,number,description,quantity,outstandingQuantity,quantityToShip";
+  const attempts = [
+    `${root}/salesOrderLines?${select}&$filter=lineObjectNumber eq ${quoted} and outstandingQuantity gt 0&$top=200`,
+    `${root}/salesOrderLines?${select}&$filter=number eq ${quoted} and outstandingQuantity gt 0&$top=200`,
+    `${root}/salesOrderLines?${select}&$filter=lineObjectNumber eq ${quoted}&$top=200`,
+    `${root}/salesOrderLines?${select}&$filter=number eq ${quoted}&$top=200`,
+  ];
+  const wanted = partNumber.toUpperCase();
+  for (const path of attempts) {
+    try {
+      const rows = await bcListAll(secrets, access, path, 800);
+      const matched = rows.filter((row) => linePart(row).toUpperCase() === wanted);
+      const open = matched.filter((row) => lineOutstanding(row) > 0);
+      if (open.length > 0) return open;
+      if (matched.length > 0) return matched;
+    } catch {
+      /* try the next field / filter */
+    }
+  }
+  return [];
+}
+
+async function fetchOrderHeaders(
+  secrets: BcSecrets,
+  access: string | null,
+  root: string,
+  ids: string[],
+): Promise<Map<string, JsonRecord>> {
+  const map = new Map<string, JsonRecord>();
+  const size = 12;
+  for (let i = 0; i < ids.length; i += size) {
+    const chunk = ids.slice(i, i + size);
+    const filter = chunk.map((id) => `id eq ${id}`).join(" or ");
+    try {
+      const data = await bcGet<ODataList<JsonRecord>>(
+        secrets,
+        access,
+        `${root}/salesOrders?$select=id,number,status,salespersonCode,fullyShipped&$filter=${encodeURIComponent(filter)}`,
+      );
+      for (const row of data.value ?? []) {
+        const id = asString(row.id);
+        if (id) map.set(id, row);
+      }
+    } catch {
+      for (const id of chunk) {
+        try {
+          const row = await bcGet<JsonRecord>(
+            secrets,
+            access,
+            `${root}/salesOrders(${id})?$select=id,number,status,salespersonCode,fullyShipped`,
+          );
+          map.set(id, row);
+        } catch {
+          /* skip one missing header */
+        }
+      }
+    }
+  }
+  return map;
+}
+
+const CLOSED = new Set(["canceled", "cancelled", "invoiced", "closed"]);
+
+export async function searchOpenOrdersByPart(
+  secrets: BcSecrets,
+  partNumber: string,
+): Promise<BcPartOrder[]> {
+  const pn = partNumber.replace(/^\s+|\s+$/g, "");
+  if (!pn) throw new Error("Part number is required.");
   const access = await token(secrets);
   const root = companyPath(secrets);
-  const meshTickets = new Set(
-    meshTicketNumbers.map((n) => n.trim().toLowerCase()).filter(Boolean),
-  );
+  const lines = await fetchLinesForPart(secrets, access, root, pn);
+  const ids = [...new Set(lines.map((row) => asString(row.documentId)).filter(Boolean))];
+  const headers = ids.length > 0 ? await fetchOrderHeaders(secrets, access, root, ids) : new Map();
 
-  const [orders, quotes, orderLines, quoteLines] = await Promise.all([
-    bcGet<ODataList<JsonRecord>>(
-      secrets,
-      access,
-      `${root}/salesOrders?$top=80&$filter=fullyShipped eq false`,
-    ).catch(() => ({ value: [] as JsonRecord[] })),
-    bcGet<ODataList<JsonRecord>>(
-      secrets,
-      access,
-      `${root}/salesQuotes?$top=40`,
-    ).catch(() => ({ value: [] as JsonRecord[] })),
-    bcGet<ODataList<JsonRecord>>(
-      secrets,
-      access,
-      `${root}/salesOrderLines?$top=400`,
-    ).catch(() => ({ value: [] as JsonRecord[] })),
-    bcGet<ODataList<JsonRecord>>(
-      secrets,
-      access,
-      `${root}/salesQuoteLines?$top=200`,
-    ).catch(() => ({ value: [] as JsonRecord[] })),
-  ]);
+  const qtyByOrder = new Map<string, { outstanding: number; description: string }>();
+  for (const row of lines) {
+    const id = asString(row.documentId);
+    if (!id) continue;
+    const prev = qtyByOrder.get(id);
+    const outstanding = lineOutstanding(row);
+    const description = asString(row.description);
+    if (!prev) qtyByOrder.set(id, { outstanding, description });
+    else {
+      prev.outstanding += outstanding;
+      if (!prev.description) prev.description = description;
+    }
+  }
 
-  const oLines = (orderLines.value ?? []).map(mapLine);
-  const qLines = (quoteLines.value ?? []).map(mapLine);
+  const out: BcPartOrder[] = [];
+  for (const id of ids) {
+    const header = headers.get(id);
+    if (!header) continue;
+    if (header.fullyShipped === true) continue;
+    const status = asString(header.status) || "Open";
+    if (CLOSED.has(status.toLowerCase())) continue;
+    const qty = qtyByOrder.get(id);
+    out.push({
+      orderId: id,
+      orderNumber: asString(header.number),
+      status,
+      salespersonCode: asString(header.salespersonCode),
+      outstanding: qty?.outstanding ?? 0,
+      description: qty?.description ?? "",
+    });
+  }
 
-  const tickets: BcTicket[] = [
-    ...(orders.value ?? []).map((row) => mapTicket(row, "order", oLines, meshTickets)),
-    ...(quotes.value ?? [])
-      .filter((row) => {
-        const status = asString(row.status).toLowerCase();
-        return status !== "accepted" && status !== "expired" && status !== "converted";
-      })
-      .map((row) => mapTicket(row, "quote", qLines, meshTickets)),
-  ];
-
-  return tickets.filter((t) => t.number);
+  return out
+    .filter((row) => row.orderNumber)
+    .sort((a, b) => a.orderNumber.localeCompare(b.orderNumber, undefined, { numeric: true }));
 }
 
 export function secretsReady(secrets: BcSecrets): boolean {
