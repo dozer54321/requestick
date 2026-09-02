@@ -19,5 +19,10 @@ Need
 
 First person to Sign in and fill their desk card is the admin.
 
+  Admin → People    add / approve accounts
+  Admin → Look      company name, mark, colors
+  Admin → Central   Business Central, read-only
+  Admin → Updates   one-button GitHub update or revert (manual)
+
 Backup:  sudo ./backup.sh
 Keep mesh.env private.

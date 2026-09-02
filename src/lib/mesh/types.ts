@@ -155,3 +155,28 @@ export type MemberPatch = {
   cell: string;
   password?: string;
 };
+
+export type ReleaseInfo = {
+  tag: string;
+  name: string;
+  publishedAt: string;
+  notes: string;
+  hasImage: boolean;
+  cached: boolean;
+  newer: boolean;
+};
+
+export type UpdateStatus = {
+  currentVersion: string;
+  latestTag: string | null;
+  updateAvailable: boolean;
+  canApply: boolean;
+  reason: string;
+  repo: string;
+  job: {
+    state: "idle" | "downloading" | "loading" | "restarting" | "error";
+    targetTag: string | null;
+    error: string | null;
+  };
+  releases: ReleaseInfo[];
+};

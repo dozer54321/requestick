@@ -15,8 +15,9 @@ import { MeshWordmark } from "./mark";
 import { PeopleAdmin } from "./team-panel";
 import { BcTicketsList } from "./bc-tickets";
 import { useBrand } from "./brand-context";
+import { UpdatesPanel } from "./updates-panel";
 
-type AdminTab = "people" | "look" | "central";
+type AdminTab = "people" | "look" | "central" | "updates";
 
 export function AdminPage() {
   const [tab, setTab] = useState<AdminTab>("people");
@@ -78,12 +79,13 @@ export function AdminPage() {
       </header>
 
       <div className="mx-auto w-full max-w-5xl px-4 pt-6 sm:px-6">
-        <div className="flex h-11 w-full max-w-md rounded-md bg-surface-2 p-1 shadow-[0_0_0_1px_var(--color-line)]">
+        <div className="flex h-11 w-full max-w-lg rounded-md bg-surface-2 p-1 shadow-[0_0_0_1px_var(--color-line)]">
           {(
             [
               ["people", "People"],
               ["look", "Look"],
               ["central", "Central"],
+              ["updates", "Updates"],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -112,6 +114,7 @@ export function AdminPage() {
           {tab === "central" ? (
             <CentralAdmin initial={settings.data?.bc} loading={settings.isPending} />
           ) : null}
+          {tab === "updates" ? <UpdatesPanel /> : null}
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ import {
   mapSecrets,
   type SettingsRow,
 } from "./settings.server";
+import { applyVersion, loadUpdateStatus } from "./update.server";
 import type {
   AccessStatus,
   AdminSettings,
@@ -36,6 +37,7 @@ import type {
   NewAccountDraft,
   PublicBrand,
   TeamAction,
+  UpdateStatus,
 } from "./types";
 import { ACCESS_STATUSES, NEED_PRIORITIES, NEED_STATUSES } from "./types";
 
@@ -858,4 +860,26 @@ export const listBcOpen = createServerFn({ method: "GET" })
       secrets,
       tickets.map((t) => t.ticket_number),
     );
+  });
+
+export const getUpdateStatus = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<UpdateStatus> => {
+    const sql = await getSql();
+    await requireAdmin(sql, context.userId);
+    return loadUpdateStatus();
+  });
+
+export const applyAppUpdate = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((raw: unknown) => {
+    const input = (raw ?? {}) as Record<string, unknown>;
+    const tag = String(input.tag ?? "").trim();
+    if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error("Pick a version from the list.");
+    return { tag };
+  })
+  .handler(async ({ context, data }): Promise<UpdateStatus> => {
+    const sql = await getSql();
+    await requireAdmin(sql, context.userId);
+    return applyVersion(data.tag);
   });

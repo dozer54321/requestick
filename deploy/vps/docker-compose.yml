@@ -41,6 +41,12 @@ services:
       HOST: 0.0.0.0
       PORT: "3000"
       NODE_ENV: production
+      REQUESTICK_VERSION: ${REQUESTICK_VERSION:-dev}
+      REQUESTICK_UPDATE_REPO: ${REQUESTICK_UPDATE_REPO:-dozer54321/requestick}
+      REQUESTICK_COMPOSE_DIR: /host/requestick
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/host/requestick
     healthcheck:
       test:
         [

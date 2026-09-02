@@ -47,6 +47,10 @@ else
   echo "MESH_DOMAIN=${DOMAIN}" >> "$ENV_FILE"
 fi
 
+if [ -f "$ROOT/VERSION" ] && ! grep -q '^REQUESTICK_VERSION=' "$ENV_FILE"; then
+  echo "REQUESTICK_VERSION=$(tr -d '[:space:]' < "$ROOT/VERSION")" >> "$ENV_FILE"
+fi
+
 load_image() {
   local f
   for f in "$ROOT/requestick-image.tar.gz" "$ROOT/../requestick-image.tar.gz"; do

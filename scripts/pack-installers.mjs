@@ -49,7 +49,7 @@ function copyCommon(dest) {
   cpSync(join(root, "scripts/migration-plan.mjs"), join(dest, "scripts/migration-plan.mjs"));
   execSync(`cp -a "${join(root, ".output")}" "${join(dest, ".output")}"`);
   writeFileSync(join(dest, ".dockerignore"), ".git\n*.env\nmesh.env\nbackups\n");
-  for (const f of ["README.md", "LICENSE"]) {
+  for (const f of ["README.md", "LICENSE", "VERSION"]) {
     if (existsSync(join(root, f))) cpSync(join(root, f), join(dest, f));
   }
 }
@@ -127,8 +127,10 @@ execSync(
 cpSync(join(root, "deploy/GITHUB.txt"), join(source, "GITHUB.txt"));
 
 if (dockerAvailable()) {
-  console.log("Building requestick:local image...");
-  execSync("docker build -t requestick:local -f deploy/vps/Dockerfile .", {
+  const version = (process.env.GITHUB_REF_NAME || readFileSync(join(root, "VERSION"), "utf8").trim() || "dev").replace(/[^A-Za-z0-9._-]/g, "");
+  writeFileSync(join(root, "VERSION"), version);
+  console.log("Building requestick:local image...", version);
+  execSync(`docker build -t requestick:local --build-arg REQUESTICK_VERSION=${version} -f deploy/vps/Dockerfile .`, {
     stdio: "inherit",
     cwd: root,
   });

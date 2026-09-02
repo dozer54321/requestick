@@ -54,6 +54,7 @@ sudo ./install requestick.yourcompany.com
 2. **Admin → People** — add accounts or approve requests.
 3. **Admin → Look** — company name, mark, colors.
 4. **Admin → Central** — optional BC, read-only.
+5. **Admin → Updates** — one button to install a GitHub release, or revert to an older one. Manual only. Tickets stay.
 
 Backup: `sudo /opt/requestick/backup.sh`
 

@@ -11,3 +11,6 @@ curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/req
 If you already have the unpacked folder:
 
   sudo ./install requestick.yourcompany.com
+
+After install, Admin → Updates can pull a newer GitHub release or revert
+to an older one. Manual only. No token.
