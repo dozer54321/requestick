@@ -3,10 +3,11 @@ REQUESTICK SETUP (Linux)
 
 One server. Sales desks only open the website.
 
-Install (the command is curl, not url). Change the hostname:
+Install — download the file, then run it (curl, not url). Change the hostname:
 
   sudo apt-get update && sudo apt-get install -y curl
-  curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.example.com
+  curl -fsSL -o /tmp/requestick-install.sh https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh
+  sudo bash /tmp/requestick-install.sh requestick.example.com
 
 Already have this folder:
 

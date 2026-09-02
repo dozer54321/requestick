@@ -12,12 +12,14 @@ for approval. Do not put two shops on one install.
 Point DNS at the server first (A record → this machine). Login needs a real
 hostname and HTTPS, not a bare IP.
 
-On the Ubuntu VPS, paste **both** lines. The first word of the second line is
-`curl` (not `url`). Change the hostname at the end.
+On the Ubuntu VPS, paste all three lines. Change the hostname on the last line.
+The download command is **`curl`** (not `url`). Save the installer to a file,
+then run it — do not pipe it into bash.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y curl
-curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.example.com
+curl -fsSL -o /tmp/requestick-install.sh https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh
+sudo bash /tmp/requestick-install.sh requestick.example.com
 ```
 
 Wait about a minute, then open `https://requestick.example.com`. First person

@@ -161,11 +161,26 @@ execSync(
 const setupPath = join(artifacts, "requestick-linux-setup.sh");
 const setupHeader = `#!/bin/bash
 # Requestick — one-file Linux installer
-# Usage: sudo bash requestick-linux-setup.sh requestick.yourcompany.com
+# Usage: sudo bash requestick-linux-setup.sh requestick.example.com
+# Piped curl|bash also works: the script copies stdin to a temp file first.
 set -euo pipefail
+case "\$0" in
+  bash|sh|-bash|-sh|dash)
+    _tmp="\$(mktemp /tmp/requestick-install.XXXXXX)"
+    cat > "\$_tmp"
+    chmod +x "\$_tmp"
+    exec bash "\$_tmp" "\$@"
+    ;;
+esac
+if [ ! -f "\$0" ]; then
+  _tmp="\$(mktemp /tmp/requestick-install.XXXXXX)"
+  cat > "\$_tmp"
+  chmod +x "\$_tmp"
+  exec bash "\$_tmp" "\$@"
+fi
 DOMAIN="\${1:-}"
 if [ -z "\$DOMAIN" ]; then
-  echo "Usage: sudo bash \$0 requestick.yourcompany.com"
+  echo "Usage: sudo bash requestick-linux-setup.sh requestick.example.com"
   echo "Use a real hostname you own (a subdomain is fine). Login needs HTTPS."
   exit 1
 fi
@@ -200,7 +215,7 @@ cp -a "\$TMP"/requestick-linux/. "\$DEST"/
 if [ -f "\$KEEP/mesh.env" ]; then cp "\$KEEP/mesh.env" "\$DEST/mesh.env"; fi
 if [ -d "\$KEEP/backups" ]; then rm -rf "\$DEST/backups"; cp -a "\$KEEP/backups" "\$DEST/backups"; fi
 cd "\$DEST"
-chmod +x install.sh backup.sh start.sh
+chmod +x install.sh install backup.sh start.sh 2>/dev/null || chmod +x install.sh backup.sh start.sh
 ./install.sh "\$DOMAIN"
 exit 0
 __REQUESTICK_ARCHIVE__
