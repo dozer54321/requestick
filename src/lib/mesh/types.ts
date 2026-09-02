@@ -7,7 +7,7 @@ export type NeedPriority = (typeof NEED_PRIORITIES)[number];
 export const ACCESS_STATUSES = ["pending", "approved", "denied"] as const;
 export type AccessStatus = (typeof ACCESS_STATUSES)[number];
 
-export type MemberRole = "admin" | "member";
+export type MemberRole = "owner" | "manager" | "member";
 
 export type MeshProfile = {
   userId: string;
@@ -47,6 +47,14 @@ export type MeshSnapshot = {
   hotCount: number;
   claimedCount: number;
   bcConnected: boolean;
+  announcement: DeskAnnouncement | null;
+};
+
+export type DeskAnnouncement = {
+  id: number;
+  body: string;
+  by: string;
+  at: string;
 };
 
 export type NeedDraft = {
@@ -65,7 +73,7 @@ export type NeedAction = "claim" | "release" | "fill" | "reopen" | "drop" | "rem
 export type StatusFilter = "open" | "claimed" | "filled" | "all" | "hidden";
 export type SortMode = "date" | "part" | "priority";
 
-export type TeamAction = "approve" | "deny" | "make_admin" | "remove_admin";
+export type TeamAction = "approve" | "deny" | "make_manager" | "remove_manager";
 
 export type Branding = {
   companyName: string;

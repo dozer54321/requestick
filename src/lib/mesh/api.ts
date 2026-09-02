@@ -38,8 +38,10 @@ import type {
   PublicBrand,
   TeamAction,
   UpdateStatus,
+  DeskAnnouncement,
 } from "./types";
 import { ACCESS_STATUSES, NEED_PRIORITIES, NEED_STATUSES } from "./types";
+import { isOwner, isStaff, mapRole } from "./roles";
 
 type ProfileRow = {
   user_id: string;
@@ -79,10 +81,6 @@ function iso(value: Date | string | null | undefined): string | null {
 
 function asBool(value: unknown): boolean {
   return value === true || value === "t" || value === "true" || value === 1;
-}
-
-function mapRole(value: string): MemberRole {
-  return value === "admin" ? "admin" : "member";
 }
 
 function mapAccess(value: string): AccessStatus {
@@ -200,20 +198,81 @@ async function loadProfile(
   return rows[0] ? mapProfile(rows[0]) : null;
 }
 
-async function ensureBootstrapAdmin(sql: Awaited<ReturnType<typeof getSql>>): Promise<void> {
+async function ensureRoles(sql: Awaited<ReturnType<typeof getSql>>): Promise<void> {
   await ensureAccessColumns(sql);
-  const admins = await sql<{ n: number }>`
+  const owners = await sql<{ n: number }>`
     select count(*)::int as n from mesh_profiles
-    where role = 'admin' and access_status = 'approved'
+    where role = 'owner' and access_status = 'approved'
   `;
-  if (Number(admins[0]?.n) > 0) return;
+  if (Number(owners[0]?.n) > 0) {
+    await sql`
+      update mesh_profiles set role = 'manager', updated_at = now()
+      where role = 'admin'
+    `;
+    return;
+  }
+  const oldestStaff = await sql<{ user_id: string }>`
+    select user_id from mesh_profiles
+    where role in ('admin', 'manager', 'owner')
+    order by created_at asc
+    limit 1
+  `;
+  if (oldestStaff[0]) {
+    await sql`
+      update mesh_profiles
+      set role = 'owner', access_status = 'approved', updated_at = now()
+      where user_id = ${oldestStaff[0].user_id}
+    `;
+    await sql`
+      update mesh_profiles set role = 'manager', updated_at = now()
+      where role = 'admin' and user_id <> ${oldestStaff[0].user_id}
+    `;
+    return;
+  }
   await sql`
     update mesh_profiles
-    set role = 'admin', access_status = 'approved', updated_at = now()
+    set role = 'owner', access_status = 'approved', updated_at = now()
     where user_id = (
       select user_id from mesh_profiles order by created_at asc limit 1
     )
   `;
+}
+
+async function ensureAnnounceColumns(sql: Awaited<ReturnType<typeof getSql>>): Promise<void> {
+  await sql.query(
+    `alter table mesh_settings add column if not exists announce_id integer not null default 0`,
+  );
+  await sql.query(
+    `alter table mesh_settings add column if not exists announce_body text not null default ''`,
+  );
+  await sql.query(
+    `alter table mesh_settings add column if not exists announce_by text not null default ''`,
+  );
+  await sql.query(
+    `alter table mesh_settings add column if not exists announce_at timestamptz`,
+  );
+}
+
+async function loadAnnouncement(
+  sql: Awaited<ReturnType<typeof getSql>>,
+): Promise<DeskAnnouncement | null> {
+  await ensureAnnounceColumns(sql);
+  const rows = await sql.query<{
+    announce_id: number;
+    announce_body: string;
+    announce_by: string;
+    announce_at: Date | string | null;
+  }>(
+    `select announce_id, announce_body, announce_by, announce_at from mesh_settings where id = 1`,
+  );
+  const row = rows[0];
+  if (!row || !row.announce_id || !row.announce_body) return null;
+  return {
+    id: Number(row.announce_id),
+    body: row.announce_body,
+    by: row.announce_by || "Desk",
+    at: iso(row.announce_at) ?? new Date().toISOString(),
+  };
 }
 
 async function requireApproved(
@@ -223,11 +282,29 @@ async function requireApproved(
   const profile = await loadProfile(sql, userId);
   if (!profile) throw new Error("Set up your station first.");
   if (profile.accessStatus === "denied") {
-    throw new Error("Access denied. Talk to an admin.");
+    throw new Error("Access denied. Talk to an owner or manager.");
   }
   if (profile.accessStatus !== "approved") {
-    throw new Error("Waiting on admin approval.");
+    throw new Error("Waiting on owner or manager approval.");
   }
+  return profile;
+}
+
+async function requireStaff(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  userId: string,
+): Promise<MeshProfile> {
+  const profile = await requireApproved(sql, userId);
+  if (!isStaff(profile.role)) throw new Error("Owner or manager only.");
+  return profile;
+}
+
+async function requireOwner(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  userId: string,
+): Promise<MeshProfile> {
+  const profile = await requireApproved(sql, userId);
+  if (!isOwner(profile.role)) throw new Error("Owner only.");
   return profile;
 }
 
@@ -235,9 +312,7 @@ async function requireAdmin(
   sql: Awaited<ReturnType<typeof getSql>>,
   userId: string,
 ): Promise<MeshProfile> {
-  const profile = await requireApproved(sql, userId);
-  if (profile.role !== "admin") throw new Error("Admins only.");
-  return profile;
+  return requireStaff(sql, userId);
 }
 
 async function listProfiles(
@@ -336,7 +411,7 @@ export const getMyProfile = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<MeshProfile | null> => {
     const sql = await getSql();
-    await ensureBootstrapAdmin(sql);
+    await ensureRoles(sql);
     return loadProfile(sql, context.userId);
   });
 
@@ -365,7 +440,7 @@ export const saveMyProfile = createServerFn({ method: "POST" })
       values (
         ${context.userId}, ${data.displayName}, ${data.extension}, ${data.cell},
         ${data.email}, ${data.alertsOn},
-        case when (select count(*) from mesh_profiles) = 0 then 'admin' else 'member' end,
+        case when (select count(*) from mesh_profiles) = 0 then 'owner' else 'member' end,
         case when (select count(*) from mesh_profiles) = 0 then 'approved' else 'pending' end,
         now()
       )
@@ -379,7 +454,7 @@ export const saveMyProfile = createServerFn({ method: "POST" })
       returning user_id, display_name, extension, cell, email, alerts_on, role, access_status
     `;
     const created = mapProfile(rows[0]);
-    await ensureBootstrapAdmin(sql);
+    await ensureRoles(sql);
     return (await loadProfile(sql, context.userId)) ?? created;
   });
 
@@ -423,6 +498,7 @@ export const getMesh = createServerFn({ method: "GET" })
       hotCount: mapped.filter((n) => n.status === "open" && n.priority === "hot").length,
       claimedCount: mapped.filter((n) => n.status === "claimed").length,
       bcConnected,
+      announcement: await loadAnnouncement(sql),
     };
   });
 
@@ -466,8 +542,8 @@ export const updateNeed = createServerFn({ method: "POST" })
     );
     const row = rows[0];
     if (!row) throw new Error("Need not found.");
-    if (row.created_by !== context.userId && profile.role !== "admin") {
-      throw new Error("Only the requester or an admin can edit this.");
+    if (row.created_by !== context.userId && !isStaff(profile.role)) {
+      throw new Error("Only the requester, an owner, or a manager can edit this.");
     }
     const updated = await sql.query<NeedRow>(
       `update mesh_needs
@@ -504,7 +580,7 @@ export const actOnNeed = createServerFn({ method: "POST" })
   .handler(async ({ context, data }): Promise<MeshNeed> => {
     const sql = await getSql();
     const profile = await requireApproved(sql, context.userId);
-    const isAdmin = profile.role === "admin";
+    const staff = isStaff(profile.role);
     const existing = await sql<NeedRow>`
       select id, created_by, part_number, description, ticket_number, qty,
              priority, notes, status, claimed_by, claimed_at, filled_by, filled_at,
@@ -515,13 +591,13 @@ export const actOnNeed = createServerFn({ method: "POST" })
     if (!row) throw new Error("Need not found.");
     const me = context.userId;
 
-    if (data.action === "drop" && row.created_by !== me && !isAdmin) {
-      throw new Error("Only the requester or an admin can hide this.");
+    if (data.action === "drop" && row.created_by !== me && !staff) {
+      throw new Error("Only the requester, an owner, or a manager can hide this.");
     }
     if (data.action === "remove") {
-      if (!isAdmin) throw new Error("Admins only.");
+      if (!staff) throw new Error("Owner or manager only.");
     }
-    if (data.action === "release" && row.claimed_by !== me && !isAdmin) {
+    if (data.action === "release" && row.claimed_by !== me && !staff) {
       throw new Error("Only the person on it can release.");
     }
 
@@ -555,7 +631,7 @@ export const actOnNeed = createServerFn({ method: "POST" })
                   created_at, updated_at
       `;
     } else if (data.action === "reopen") {
-      if (isAdmin) {
+      if (staff) {
         rows = await sql<NeedRow>`
           update mesh_needs
           set status = 'open', claimed_by = null, claimed_at = null,
@@ -584,7 +660,7 @@ export const actOnNeed = createServerFn({ method: "POST" })
                   priority, notes, status, claimed_by, claimed_at, filled_by, filled_at,
                   created_at, updated_at
       `;
-    } else if (isAdmin) {
+    } else if (staff) {
       rows = await sql<NeedRow>`
         update mesh_needs
         set status = 'cancelled', updated_at = now()
@@ -623,37 +699,34 @@ export const setTeamAccess = createServerFn({ method: "POST" })
     const userId = cleanText(input.userId, 80);
     const action = String(input.action ?? "") as TeamAction;
     if (!userId) throw new Error("Missing teammate.");
-    if (!["approve", "deny", "make_admin", "remove_admin"].includes(action)) {
+    if (!["approve", "deny", "make_manager", "remove_manager"].includes(action)) {
       throw new Error("Invalid action.");
     }
     return { userId, action };
   })
   .handler(async ({ context, data }): Promise<MeshProfile[]> => {
     const sql = await getSql();
-    await requireAdmin(sql, context.userId);
+    const actor = await requireStaff(sql, context.userId);
     const target = await loadProfile(sql, data.userId);
     if (!target) throw new Error("No such account.");
+    if (target.role === "owner" && data.userId !== context.userId) {
+      throw new Error("The owner cannot be changed from here.");
+    }
 
-    if (data.action === "remove_admin") {
-      if (data.userId === context.userId) {
-        throw new Error("You can't drop your own admin seat.");
-      }
-      const admins = await sql<{ n: number }>`
-        select count(*)::int as n from mesh_profiles
-        where role = 'admin' and access_status = 'approved'
-      `;
-      if (Number(admins[0]?.n) <= 1) {
-        throw new Error("Keep at least one admin.");
-      }
+    if (data.action === "remove_manager") {
+      if (!isOwner(actor.role)) throw new Error("Only the owner can remove a manager.");
+      if (target.role !== "manager") throw new Error("That person is not a manager.");
       await sql`
         update mesh_profiles
         set role = 'member', updated_at = now()
         where user_id = ${data.userId}
       `;
-    } else if (data.action === "make_admin") {
+    } else if (data.action === "make_manager") {
+      if (!isOwner(actor.role)) throw new Error("Only the owner can make a manager.");
+      if (target.role === "owner") throw new Error("The owner already has that seat.");
       await sql`
         update mesh_profiles
-        set role = 'admin', access_status = 'approved', updated_at = now()
+        set role = 'manager', access_status = 'approved', updated_at = now()
         where user_id = ${data.userId}
       `;
     } else if (data.action === "approve") {
@@ -665,6 +738,10 @@ export const setTeamAccess = createServerFn({ method: "POST" })
     } else {
       if (data.userId === context.userId) {
         throw new Error("You can't deny your own access.");
+      }
+      if (target.role === "owner") throw new Error("The owner cannot be denied.");
+      if (target.role === "manager" && !isOwner(actor.role)) {
+        throw new Error("Only the owner can revoke a manager.");
       }
       await sql`
         update mesh_profiles
@@ -686,7 +763,7 @@ export const createAccount = createServerFn({ method: "POST" })
     if (displayName.length < 2) throw new Error("Name is required.");
     if (!looksLikeEmail(email)) throw new Error("A real email is required.");
     if (password.length < 8) throw new Error("Password must be at least 8 characters.");
-    const role: MemberRole = input.role === "admin" ? "admin" : "member";
+    const role: MemberRole = input.role === "manager" ? "manager" : "member";
     return {
       displayName,
       email,
@@ -698,8 +775,9 @@ export const createAccount = createServerFn({ method: "POST" })
   })
   .handler(async ({ context, data }): Promise<MeshProfile[]> => {
     const sql = await getSql();
-    await requireAdmin(sql, context.userId);
+    const actor = await requireStaff(sql, context.userId);
     await ensureAccessColumns(sql);
+    const role = isOwner(actor.role) && data.role === "manager" ? "manager" : "member";
     const userId = await createCredentialUser(sql, {
       name: data.displayName,
       email: data.email,
@@ -710,7 +788,7 @@ export const createAccount = createServerFn({ method: "POST" })
          user_id, display_name, extension, cell, email, alerts_on,
          role, access_status, updated_at
        ) values ($1, $2, $3, $4, $5, true, $6, 'approved', now())`,
-      [userId, data.displayName, data.extension, data.cell, data.email, data.role],
+      [userId, data.displayName, data.extension, data.cell, data.email, role],
     );
     return listProfiles(sql);
   });
@@ -866,7 +944,7 @@ export const getUpdateStatus = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<UpdateStatus> => {
     const sql = await getSql();
-    await requireAdmin(sql, context.userId);
+    await requireOwner(sql, context.userId);
     return loadUpdateStatus();
   });
 
@@ -880,6 +958,50 @@ export const applyAppUpdate = createServerFn({ method: "POST" })
   })
   .handler(async ({ context, data }): Promise<UpdateStatus> => {
     const sql = await getSql();
-    await requireAdmin(sql, context.userId);
+    await requireOwner(sql, context.userId);
     return applyVersion(data.tag);
+  });
+
+export const postAnnouncement = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((raw: unknown) => {
+    const input = (raw ?? {}) as Record<string, unknown>;
+    const body = cleanText(input.body, 200);
+    if (body.length < 2) throw new Error("Write a short announcement.");
+    return { body };
+  })
+  .handler(async ({ context, data }): Promise<DeskAnnouncement> => {
+    const sql = await getSql();
+    const actor = await requireStaff(sql, context.userId);
+    await ensureAnnounceColumns(sql);
+    await sql.query(
+      `update mesh_settings
+       set announce_id = announce_id + 1,
+           announce_body = $1,
+           announce_by = $2,
+           announce_at = now(),
+           updated_at = now()
+       where id = 1`,
+      [data.body, actor.displayName],
+    );
+    const next = await loadAnnouncement(sql);
+    if (!next) throw new Error("Could not post that announcement.");
+    return next;
+  });
+
+export const wipeBoard = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((raw: unknown) => {
+    const input = (raw ?? {}) as Record<string, unknown>;
+    if (String(input.confirm ?? "").trim().toUpperCase() !== "WIPE") {
+      throw new Error('Type WIPE to confirm.');
+    }
+    return { confirm: "WIPE" as const };
+  })
+  .handler(async ({ context }): Promise<{ removed: number }> => {
+    const sql = await getSql();
+    await requireStaff(sql, context.userId);
+    const before = await sql.query<{ n: number }>(`select count(*)::int as n from mesh_needs`);
+    await sql.query(`delete from mesh_needs`);
+    return { removed: Number(before[0]?.n ?? 0) };
   });

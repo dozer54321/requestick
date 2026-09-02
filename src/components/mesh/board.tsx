@@ -7,6 +7,7 @@ import {
   BellOff,
   ClipboardList,
   Download,
+  Megaphone,
   MessageSquare,
   EyeOff,
   Pencil,
@@ -23,9 +24,11 @@ import {
   getMesh,
   getMyProfile,
   listTeam,
+  postAnnouncement,
   postNeed,
   saveMyProfile,
   updateNeed,
+  wipeBoard,
 } from "@/lib/mesh/api";
 import type {
   MeshNeed,
@@ -58,6 +61,7 @@ import {
   requestAlertPermission,
   restoreTitle,
 } from "@/lib/mesh/notify";
+import { isStaff } from "@/lib/mesh/roles";
 import { UserButton } from "@/lib/auth/gates";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -87,6 +91,8 @@ export function Board() {
   const [postOpen, setPostOpen] = useState(false);
   const [stationOpen, setStationOpen] = useState(false);
   const [bcOpen, setBcOpen] = useState(false);
+  const [announceOpen, setAnnounceOpen] = useState(false);
+  const [wipeOpen, setWipeOpen] = useState(false);
   const [noticePerm, setNoticePerm] = useState<NotificationPermission>(
     typeof Notification === "undefined" ? "denied" : Notification.permission,
   );
@@ -109,7 +115,7 @@ export function Board() {
   const team = useQuery({
     queryKey: ["mesh-team"],
     queryFn: () => listTeam(),
-    enabled: approved && profile.data?.role === "admin",
+    enabled: approved && isStaff(profile.data?.role),
     refetchInterval: 8000,
   });
 
@@ -117,11 +123,42 @@ export function Board() {
     const data = mesh.data;
     if (!data) return;
     const alerts = diffAlerts(prevRef.current, data, profile.data?.displayName ?? "");
+    const prevAnnounce = prevRef.current?.announcement?.id ?? 0;
     prevRef.current = data;
-    if (alerts.length === 0) return;
-    fireAlerts(alerts, data.profiles, data.me);
-    for (const a of alerts) {
-      toast(a.title, { description: a.body });
+    if (alerts.length > 0) {
+      fireAlerts(alerts, data.profiles, data.me);
+      for (const a of alerts) {
+        toast(a.title, { description: a.body });
+      }
+    }
+    const note = data.announcement;
+    if (note && note.id !== prevAnnounce) {
+      let seen = 0;
+      try {
+        seen = Number(localStorage.getItem("mesh.lastAnnounce") || "0");
+      } catch {
+        seen = 0;
+      }
+      if (note.id !== seen) {
+        toast(note.body, { description: `${note.by} · desk announcement` });
+        fireAlerts(
+          [
+            {
+              title: `Desk: ${note.by}`,
+              body: note.body,
+              tag: `announce-${note.id}`,
+              hot: true,
+            },
+          ],
+          data.profiles,
+          data.me,
+        );
+        try {
+          localStorage.setItem("mesh.lastAnnounce", String(note.id));
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }, [mesh.data, profile.data?.displayName]);
 
@@ -270,7 +307,7 @@ export function Board() {
             >
               {alertsOn ? <Bell className="size-4" /> : <BellOff className="size-4" />}
             </Button>
-            {mine.role === "admin" ? (
+            {isStaff(mine.role) ? (
               <Button asChild variant="outline" size="sm" className="relative">
                 <Link to="/admin">
                   <Shield className="size-3.5" />
@@ -282,6 +319,18 @@ export function Board() {
                   ) : null}
                 </Link>
               </Button>
+            ) : null}
+            {isStaff(mine.role) ? (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setAnnounceOpen(true)}>
+                  <Megaphone className="size-3.5" />
+                  <span className="hidden sm:inline">Announce</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setWipeOpen(true)}>
+                  <Trash2 className="size-3.5" />
+                  <span className="hidden sm:inline">Wipe</span>
+                </Button>
+              </>
             ) : null}
             {snapshot?.bcConnected ? (
               <Button variant="outline" size="sm" onClick={() => setBcOpen(true)}>
@@ -333,7 +382,7 @@ export function Board() {
                 { value: "claimed", label: "On it" },
                 { value: "filled", label: "Filled" },
                 { value: "all", label: "All" },
-                ...(mine.role === "admin"
+                ...(isStaff(mine.role)
                   ? [{ value: "hidden" as const, label: "Hidden" }]
                   : []),
               ]}
@@ -391,7 +440,7 @@ export function Board() {
                         snapshot={snapshot!}
                         mineId={snapshot!.me}
                         myName={mine.displayName}
-                        isAdmin={mine.role === "admin"}
+                        isAdmin={isStaff(mine.role)}
                       />
                     </li>
                   ))}
@@ -418,6 +467,9 @@ export function Board() {
       />
 
       <BcTicketsDialog open={bcOpen} onOpenChange={setBcOpen} />
+
+      <AnnounceDialog open={announceOpen} onOpenChange={setAnnounceOpen} />
+      <WipeDialog open={wipeOpen} onOpenChange={setWipeOpen} />
 
       <Dialog open={stationOpen} onOpenChange={setStationOpen}>
         <DialogContent>
@@ -1143,6 +1195,130 @@ function groupLabel(sort: SortMode, key: string, items: MeshNeed[]): string {
     return "When you can";
   }
   return key;
+}
+
+function AnnounceDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const [body, setBody] = useState("");
+  const send = useMutation({
+    mutationFn: () => postAnnouncement({ data: { body } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["mesh"] });
+      toast("Announcement sent");
+      setBody("");
+      onOpenChange(false);
+    },
+    onError: (err: Error) => toast.error(err.message || "Could not announce."),
+  });
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Announce to the desk</DialogTitle>
+          <DialogDescription>
+            Everyone with the board open gets a toast and a Windows alert. Manual only.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            send.mutate();
+          }}
+        >
+          <Textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            maxLength={200}
+            rows={3}
+            placeholder="Parts truck is here — pull your fills."
+            required
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={send.isPending || body.trim().length < 2}>
+              Send toast
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function WipeDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const [confirm, setConfirm] = useState("");
+  const wipe = useMutation({
+    mutationFn: () => wipeBoard({ data: { confirm } }),
+    onSuccess: (result) => {
+      void qc.invalidateQueries({ queryKey: ["mesh"] });
+      toast(`Wiped ${result.removed} request${result.removed === 1 ? "" : "s"}`);
+      setConfirm("");
+      onOpenChange(false);
+    },
+    onError: (err: Error) => toast.error(err.message || "Could not wipe."),
+  });
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setConfirm("");
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Wipe the board?</DialogTitle>
+          <DialogDescription>
+            This permanently deletes every request, including hidden ones. Business
+            Central is not touched. Type WIPE to confirm.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            wipe.mutate();
+          }}
+        >
+          <Input
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="WIPE"
+            autoComplete="off"
+            aria-label="Type WIPE to confirm"
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="hot"
+              disabled={wipe.isPending || confirm.trim().toUpperCase() !== "WIPE"}
+            >
+              Wipe tickets
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function BoardSkeleton() {

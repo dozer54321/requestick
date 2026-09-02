@@ -35,10 +35,16 @@ Sales use Chrome or Edge. Nothing is installed on the desks.
 
 ## Admin
 
-1. **People** — add accounts or approve sign-ups
+1. **People** — add accounts or approve sign-ups. The first login is the
+   **owner**. The owner can make **managers** (same desk rights; the owner can
+   remove them).
 2. **Look** — company name, mark, colors
 3. **Central** — Business Central, read-only (`API.Read.All` only)
-4. **Updates** — install a GitHub release, or revert to an older one. Manual only. Tickets and logins stay; the site restarts for about 30 seconds.
+4. **Updates** — owner only. Install a GitHub release or revert. Manual only.
+
+On the board, owner and managers can **Announce** (toast + Windows alert to
+everyone on the desk) and **Wipe** the tickets (type `WIPE` to confirm).
+Business Central is not touched.
 
 Daily: post a request, **On it** / **Filled**, Call or Text. Leave the tab open
 for Windows alerts. Admins **Hide** or **Remove** a request.

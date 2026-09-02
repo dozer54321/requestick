@@ -16,6 +16,7 @@ import { PeopleAdmin } from "./team-panel";
 import { BcTicketsList } from "./bc-tickets";
 import { useBrand } from "./brand-context";
 import { UpdatesPanel } from "./updates-panel";
+import { isOwner, isStaff } from "@/lib/mesh/roles";
 
 type AdminTab = "people" | "look" | "central" | "updates";
 
@@ -28,7 +29,7 @@ export function AdminPage() {
   const settings = useQuery({
     queryKey: ["mesh-admin"],
     queryFn: () => getAdminSettings(),
-    enabled: profile.data?.role === "admin",
+    enabled: isStaff(profile.data?.role),
   });
 
   const mine = profile.data;
@@ -42,12 +43,12 @@ export function AdminPage() {
     );
   }
 
-  if (!mine || mine.role !== "admin" || mine.accessStatus !== "approved") {
+  if (!mine || !isStaff(mine.role) || mine.accessStatus !== "approved") {
     return (
       <div className="mx-auto flex min-h-[70dvh] max-w-lg flex-col justify-center px-4 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight">Admins only</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Owner and managers</h1>
         <p className="mt-2 text-sm text-muted">
-          Account, branding, and Business Central settings sit behind an admin login.
+          Accounts, branding, and Business Central sit behind an owner or manager login.
         </p>
         <Button asChild className="mt-6 w-fit">
           <Link to="/">Back to the board</Link>
@@ -85,7 +86,7 @@ export function AdminPage() {
               ["people", "People"],
               ["look", "Look"],
               ["central", "Central"],
-              ["updates", "Updates"],
+              ...(isOwner(mine.role) ? ([["updates", "Updates"]] as const) : []),
             ] as const
           ).map(([value, label]) => (
             <button
@@ -103,7 +104,7 @@ export function AdminPage() {
         </div>
 
         <div className="mt-6">
-          {tab === "people" ? <PeopleAdmin myId={mine.userId} /> : null}
+          {tab === "people" ? <PeopleAdmin myId={mine.userId} myRole={mine.role} /> : null}
           {tab === "look" ? (
             <LookAdmin
               initial={settings.data?.branding}
@@ -114,7 +115,7 @@ export function AdminPage() {
           {tab === "central" ? (
             <CentralAdmin initial={settings.data?.bc} loading={settings.isPending} />
           ) : null}
-          {tab === "updates" ? <UpdatesPanel /> : null}
+          {tab === "updates" && isOwner(mine.role) ? <UpdatesPanel /> : null}
         </div>
       </div>
     </div>

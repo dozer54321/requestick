@@ -15,8 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCell } from "@/lib/mesh/format";
+import { isOwner } from "@/lib/mesh/roles";
 
-export function PeopleAdmin({ myId }: { myId: string }) {
+export function PeopleAdmin({ myId, myRole }: { myId: string; myRole: MemberRole }) {
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<MeshProfile | null>(null);
@@ -48,7 +49,8 @@ export function PeopleAdmin({ myId }: { myId: string }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-xl text-sm text-muted">
           Add people yourself, or approve anyone who requested a login. Nobody sees
-          tickets or cells until they are approved.
+          tickets or cells until they are approved. The owner can make managers;
+          managers have the same desk rights and can be removed by the owner.
         </p>
         <Button onClick={() => setAddOpen(true)}>Add account</Button>
       </div>
@@ -63,6 +65,7 @@ export function PeopleAdmin({ myId }: { myId: string }) {
                 key={p.userId}
                 profile={p}
                 mine={p.userId === myId}
+                ownerView={isOwner(myRole)}
                 busy={act.isPending}
                 onAct={(action) => act.mutate({ userId: p.userId, action })}
                 onEdit={() => setEditing(p)}
@@ -75,6 +78,7 @@ export function PeopleAdmin({ myId }: { myId: string }) {
                 key={p.userId}
                 profile={p}
                 mine={p.userId === myId}
+                ownerView={isOwner(myRole)}
                 busy={act.isPending}
                 onAct={(action) => act.mutate({ userId: p.userId, action })}
                 onEdit={() => setEditing(p)}
@@ -88,6 +92,7 @@ export function PeopleAdmin({ myId }: { myId: string }) {
                   key={p.userId}
                   profile={p}
                   mine={p.userId === myId}
+                  ownerView={isOwner(myRole)}
                   busy={act.isPending}
                   onAct={(action) => act.mutate({ userId: p.userId, action })}
                   onEdit={() => setEditing(p)}
@@ -108,6 +113,7 @@ export function PeopleAdmin({ myId }: { myId: string }) {
           const rows = await createAccount({ data: draft });
           qc.setQueryData(["mesh-team"], rows);
         }}
+        allowManager={isOwner(myRole)}
       />
 
       <AccountForm
@@ -163,12 +169,14 @@ function Section({
 function MemberRow({
   profile,
   mine,
+  ownerView,
   busy,
   onAct,
   onEdit,
 }: {
   profile: MeshProfile;
   mine: boolean;
+  ownerView: boolean;
   busy: boolean;
   onAct: (action: TeamAction) => void;
   onEdit: () => void;
@@ -188,7 +196,8 @@ function MemberRow({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1">
-          {profile.role === "admin" ? <Badge tone="claimed">Admin</Badge> : null}
+          {profile.role === "owner" ? <Badge tone="claimed">Owner</Badge> : null}
+          {profile.role === "manager" ? <Badge tone="today">Manager</Badge> : null}
           <Badge
             tone={
               profile.accessStatus === "approved"
@@ -221,24 +230,26 @@ function MemberRow({
             Approve
           </Button>
         ) : null}
-        {profile.accessStatus === "approved" && profile.role !== "admin" ? (
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => onAct("make_admin")}>
-            Make admin
+        {ownerView &&
+        profile.accessStatus === "approved" &&
+        profile.role === "member" ? (
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => onAct("make_manager")}>
+            Make manager
           </Button>
         ) : null}
-        {profile.accessStatus === "approved" && !mine ? (
+        {profile.accessStatus === "approved" && !mine && profile.role !== "owner" ? (
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => onAct("deny")}>
             Revoke
           </Button>
         ) : null}
-        {profile.role === "admin" && !mine ? (
+        {ownerView && profile.role === "manager" && !mine ? (
           <Button
             size="sm"
             variant="ghost"
             disabled={busy}
-            onClick={() => onAct("remove_admin")}
+            onClick={() => onAct("remove_manager")}
           >
-            Remove admin
+            Remove manager
           </Button>
         ) : null}
       </div>
@@ -254,6 +265,7 @@ function AccountForm({
   submitLabel,
   initial,
   onSubmit,
+  allowManager = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -269,6 +281,7 @@ function AccountForm({
     cell: string;
     role: MemberRole;
   }) => Promise<void>;
+  allowManager?: boolean;
 }) {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -376,11 +389,11 @@ function AccountForm({
               />
             </Field>
           </div>
-          {!isEdit ? (
+          {!isEdit && allowManager ? (
             <div className="flex flex-col gap-1.5">
               <Label>Role</Label>
               <div className="grid grid-cols-2 gap-1.5">
-                {(["member", "admin"] as const).map((value) => (
+                {(["member", "manager"] as const).map((value) => (
                   <button
                     key={value}
                     type="button"
