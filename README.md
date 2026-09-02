@@ -4,8 +4,6 @@ Company-only sales board for FFL inside sales. Post a part on an open dealer
 ticket, ping the desk, call Ring Central or text a cell. Admins approve logins,
 set the shop look, and can read open tickets from Business Central.
 
-Nothing is hosted on Grok. You run one copy on a machine you control.
-
 ## Best use
 
 | Who | What they do |
