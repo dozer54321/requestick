@@ -68,13 +68,13 @@ sudo /opt/requestick/backup.sh
 Keep `mesh.env` (database password and sign-in secret). Do not delete the
 Docker volume `mesh_pgdata`.
 
-If an in-app update sits on “Restarting…” and never swaps, the new image is
-already loaded. On the VPS:
+If Updates says the compose folder is not mounted, the host still has an old
+`docker-compose.yml`. Tickets stay. On the VPS:
 
 ```bash
 cd /opt/requestick
-docker compose --env-file mesh.env up -d --no-deps --force-recreate app
-docker compose --env-file mesh.env ps
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/dozer54321/requestick/main/deploy/vps/docker-compose.yml
+docker compose --env-file mesh.env up -d --force-recreate app
 ```
 
 ## Docker pack

@@ -109,8 +109,7 @@ function writeJob(job: JobState): void {
   }
 }
 
-async function hostComposeDir(): Promise<string> {
-  const dest = composeDir();
+async function inspectIds(): Promise<string[]> {
   const ids: string[] = [];
   try {
     const { stdout } = await execFile("hostname", [], { timeout: 3000 });
@@ -118,19 +117,33 @@ async function hostComposeDir(): Promise<string> {
   } catch {
     /* ignore */
   }
-  try {
-    const { stdout } = await execFile(
-      "docker",
-      ["ps", "-aq", "--filter", "name=mesh-app"],
-      { timeout: 8000 },
-    );
-    for (const id of stdout.split("\n").map((s) => s.trim()).filter(Boolean)) {
-      ids.push(id);
+  const filters = [
+    ["ps", "-aq", "--filter", "name=mesh-app"],
+    [
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=mesh",
+      "--filter",
+      "label=com.docker.compose.service=app",
+    ],
+  ];
+  for (const args of filters) {
+    try {
+      const { stdout } = await execFile("docker", args, { timeout: 8000 });
+      for (const id of stdout.split("\n").map((s) => s.trim()).filter(Boolean)) {
+        if (!ids.includes(id)) ids.push(id);
+      }
+    } catch {
+      /* next */
     }
-  } catch {
-    /* ignore */
   }
-  for (const id of ids) {
+  return ids;
+}
+
+async function hostComposeDir(): Promise<string | null> {
+  const dest = composeDir();
+  for (const id of await inspectIds()) {
     try {
       const { stdout } = await execFile(
         "docker",
@@ -144,9 +157,25 @@ async function hostComposeDir(): Promise<string> {
     } catch {
       /* next */
     }
+    try {
+      const { stdout } = await execFile(
+        "docker",
+        [
+          "inspect",
+          "-f",
+          `{{index .Config.Labels "com.docker.compose.project.working_dir"}}`,
+          id,
+        ],
+        { timeout: 8000 },
+      );
+      const dir = stdout.trim();
+      if (dir.startsWith("/")) return dir;
+    } catch {
+      /* next */
+    }
   }
   if (existsSync("/opt/requestick/docker-compose.yml")) return "/opt/requestick";
-  return dest;
+  return null;
 }
 
 async function dockerOk(): Promise<boolean> {
@@ -210,16 +239,17 @@ export async function loadUpdateStatus(): Promise<UpdateStatus> {
   const current = currentVersion();
   const sock = existsSync("/var/run/docker.sock");
   const dir = composeDir();
-  const hasCompose =
+  const filesHere =
     existsSync(join(dir, "docker-compose.yml")) && existsSync(join(dir, "mesh.env"));
   const hasDocker = sock && (await dockerOk());
-  let canApply = hasDocker && hasCompose;
+  const hostDir = hasDocker ? await hostComposeDir() : null;
+  let canApply = Boolean(hasDocker && (filesHere || hostDir));
   let reason = "";
   if (!sock || !hasDocker) {
     reason =
       "This copy cannot swap its own containers (no Docker socket). On a VPS install this button works.";
     canApply = false;
-  } else if (!hasCompose) {
+  } else if (!filesHere && !hostDir) {
     reason = "The compose folder is not mounted, so this copy cannot restart itself.";
     canApply = false;
   }
@@ -325,7 +355,7 @@ export async function applyVersion(tag: string): Promise<UpdateStatus> {
 
     // Bind-mount the *host* compose folder. Volume paths on docker.sock are
     // host paths — /host/requestick only exists inside this container.
-    const hostDir = await hostComposeDir();
+    const hostDir = (await hostComposeDir()) || "/opt/requestick";
     await execFile("docker", ["rm", "-f", "mesh-updater"], { timeout: 15_000 }).catch(() => {});
     const { spawn } = await import("node:child_process");
     const child = spawn(
@@ -350,6 +380,8 @@ export async function applyVersion(tag: string): Promise<UpdateStatus> {
           "sleep 2",
           "mkdir -p /work/backups /root/.docker/cli-plugins",
           "cp -f /usr/local/lib/docker/cli-plugins/docker-compose /root/.docker/cli-plugins/docker-compose 2>/dev/null || true",
+          "if [ -f /app/host-pack/docker-compose.yml ]; then cp -f /app/host-pack/docker-compose.yml /work/docker-compose.yml; fi",
+          "if [ -f /app/host-pack/Caddyfile ]; then cp -f /app/host-pack/Caddyfile /work/Caddyfile; fi",
           "docker compose --env-file mesh.env -p mesh up -d --no-deps --force-recreate --remove-orphans app > /work/backups/update.log 2>&1",
         ].join(" && "),
       ],

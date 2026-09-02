@@ -22,6 +22,7 @@ COPY scripts ./scripts
 COPY migrations ./migrations
 COPY VERSION ./VERSION
 COPY .output ./.output
+COPY deploy/vps/docker-compose.yml deploy/vps/Caddyfile /app/host-pack/
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
