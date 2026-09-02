@@ -1,20 +1,30 @@
 #!/bin/bash
 # Requestick — one-shot install on Ubuntu 22.04 / 24.04
-# Installs Docker if needed, then starts the premade compose stack.
-# Usage (as root or with sudo):
-#   ./install.sh requestick.yourcompany.com
+# Usage:
+#   sudo ./install requestick.yourcompany.com
+#   sudo ./install.sh requestick.yourcompany.com
+# If you omit the hostname, it will ask.
 set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Need sudo so Docker can be installed. Re-running with sudo..."
+  exec sudo -E "$0" "$@"
+fi
 
 DOMAIN="${1:-}"
 if [ -z "$DOMAIN" ]; then
-  echo "Usage: sudo ./install.sh requestick.yourcompany.com"
-  echo "Use a real hostname you own (a subdomain is fine). Login cookies need HTTPS."
+  if [ -t 0 ] || [ -e /dev/tty ]; then
+    read -r -p "Hostname (example: requestick.yourcompany.com): " DOMAIN < /dev/tty
+  fi
+fi
+DOMAIN="$(echo "$DOMAIN" | tr -d '[:space:]')"
+if [ -z "$DOMAIN" ]; then
+  echo "Usage: sudo ./install requestick.yourcompany.com"
+  echo "Use a real hostname you own (a subdomain is fine). Login needs HTTPS, not a bare IP."
   exit 1
 fi
-
-if [ "$(id -u)" -ne 0 ]; then
-  echo "Re-run with sudo so Docker and the firewall can be set up."
-  echo "If Docker is already installed and this user can run it:  ./start.sh $DOMAIN"
+if echo "$DOMAIN" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "Use a real hostname you own. Login will not work on a bare IP."
   exit 1
 fi
 
@@ -22,7 +32,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
 if [ ! -f "$ROOT/docker-compose.yml" ]; then
-  echo "Missing docker-compose.yml. Unpack the full Requestick pack first."
+  echo "Missing docker-compose.yml. Unpack the full Requestick pack first, then run ./install from that folder."
   exit 1
 fi
 
@@ -56,5 +66,6 @@ if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: a
   ufw allow 443/tcp
 fi
 
-chmod +x "$ROOT/start.sh" "$ROOT/backup.sh" 2>/dev/null || true
+chmod +x "$ROOT/start.sh" "$ROOT/backup.sh" "$ROOT/install.sh" 2>/dev/null || true
+chmod +x "$ROOT/install" 2>/dev/null || true
 "$ROOT/start.sh" "$DOMAIN"

@@ -75,6 +75,10 @@ if (existsSync(join(root, "deploy/vps/START HERE.txt"))) {
 if (existsSync(join(root, "deploy/vps/PASTE.txt"))) {
   cpSync(join(root, "deploy/vps/PASTE.txt"), join(linux, "PASTE.txt"));
 }
+if (existsSync(join(root, "deploy/vps/install"))) {
+  cpSync(join(root, "deploy/vps/install"), join(linux, "install"));
+  chmodSync(join(linux, "install"), 0o755);
+}
 chmodSync(join(linux, "install.sh"), 0o755);
 
 const win = join(staging, "requestick-windows");

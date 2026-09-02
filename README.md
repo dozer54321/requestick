@@ -25,61 +25,55 @@ the tab open for Windows alerts. Admins **Hide** a request off the board, or
 Business Central is **read-only** (`API.Read.All` only). Requestick never writes
 back to BC.
 
-## Copy/paste on an Ubuntu VPS
+## Install on an Ubuntu VPS (one paste)
 
-SSH into the VPS (or use the host’s web console). Point DNS **before** you
-install: A record `requestick.yourcompany.com` → this server’s public IP.
-Login needs a real hostname and HTTPS, not a bare IP.
+Point DNS first: A record `requestick.yourcompany.com` → this server’s IP.
+Login needs a real hostname, not a bare IP.
 
-Need: Ubuntu 22.04 or 24.04, 2 GB RAM+, and a GitHub token that can **read**
-this private repo. Create one at
+Make a GitHub token that can read this private repo:
 [github.com/settings/tokens](https://github.com/settings/tokens)
-(classic: `repo`; or fine-grained: this repo, **Contents: Read**).
+(classic: `repo`, or fine-grained: this repo, **Contents: Read**).
 
-### 1. Download
-
-Paste this whole block. It asks for the token (hidden) and saves
-`requestick-linux.tar.gz` in the current folder.
+SSH into the VPS and paste this **one** block. It asks for the token and the
+hostname, then downloads and installs.
 
 ```bash
-sudo apt-get update -y
-sudo apt-get install -y curl ca-certificates python3
-read -s -p "GitHub token: " GH_TOKEN; echo
+sudo bash <<'EOF'
+set -euo pipefail
+apt-get update -y
+apt-get install -y curl ca-certificates python3
+read -s -p "GitHub token: " GH_TOKEN < /dev/tty; echo
+read -p "Hostname (example: requestick.yourcompany.com): " HOST < /dev/tty
+HOST="$(echo "$HOST" | tr -d '[:space:]')"
+if [ -z "$HOST" ]; then echo "Need a hostname."; exit 1; fi
 ASSET=$(curl -fsSL \
   -H "Authorization: Bearer $GH_TOKEN" \
   -H "Accept: application/vnd.github+json" \
   https://api.github.com/repos/dozer54321/requestick/releases/latest \
-  | python3 -c "import sys,json; a=[x for x in json.load(sys.stdin)['assets'] if x['name']=='requestick-linux.tar.gz']; print(a[0]['url'] if a else '')")
-if [ -z "$ASSET" ]; then echo "Download failed. Check the token and that a release exists."; exit 1; fi
+  | python3 -c "import sys,json; a=[x for x in json.load(sys.stdin)['assets'] if x['name']=='requestick-linux-setup.sh']; print(a[0]['url'] if a else '')")
+if [ -z "$ASSET" ]; then echo "Download failed. Check the token."; exit 1; fi
 curl -fL --progress-bar \
   -H "Authorization: Bearer $GH_TOKEN" \
   -H "Accept: application/octet-stream" \
-  -o requestick-linux.tar.gz "$ASSET"
+  -o /tmp/requestick-install "$ASSET"
 unset GH_TOKEN
-ls -lh requestick-linux.tar.gz
+chmod +x /tmp/requestick-install
+bash /tmp/requestick-install "$HOST"
+EOF
 ```
 
-Wait until `ls` prints a size (about 1–2 MB). Then go to step 2. The token is
-only used for this download — it is not stored on the server.
+Wait about a minute, then open `https://your-hostname`. First person through
+Sign in + desk card is the admin.
 
-Already have the file from the Releases page? Skip this step and put
-`requestick-linux.tar.gz` in the folder you will run step 2 from.
-
-### 2. Install
-
-Change the hostname on the last line, then paste:
+If you already downloaded the pack from Releases:
 
 ```bash
-sudo mkdir -p /opt/requestick
-sudo tar -xzf requestick-linux.tar.gz -C /opt/requestick --strip-components=1
-cd /opt/requestick
-sudo chmod +x install.sh start.sh backup.sh
-sudo ./install.sh requestick.yourcompany.com
+tar -xzf requestick-linux.tar.gz
+cd requestick-linux
+sudo ./install requestick.yourcompany.com
 ```
 
-That installs Docker if needed, writes secrets into `/opt/requestick/mesh.env`,
-and starts the stack. Wait a minute, then open `https://requestick.yourcompany.com`.
-First person through Sign in + desk card is the admin.
+`./install` asks for the hostname if you leave it off, and uses sudo if needed.
 
 ## After install
 
@@ -108,12 +102,11 @@ chmod +x start.sh backup.sh
 Windows (Docker Desktop running):
 
 ```powershell
-# extract requestick-docker.tar.gz, then:
 .\start.ps1 requestick.yourcompany.com
 ```
 
-A GitHub Release can also attach `requestick-image.tar.gz`. Drop that file next
-to `docker-compose.yml` and start will **load** it instead of building.
+Drop `requestick-image.tar.gz` next to `docker-compose.yml` and start will
+**load** it instead of building.
 
 ## What you buy
 
@@ -128,26 +121,13 @@ This repo is **private**. Sales never clone it — they only open the shop URL.
 
 Releases (Actions, on a `v*` tag) attach:
 
-- `requestick-linux.tar.gz` — VPS pack (the copy/paste above)
-- `requestick-linux-setup.sh` — same pack as one file
-- `requestick-docker.tar.gz` / `requestick-image.tar.gz` — premade image
-- `requestick-windows.zip` — Windows server
-- `requestick-source.tar.gz` — source
+- `requestick-linux-setup.sh` — one-file installer (what the paste above uses)
+- `requestick-linux.tar.gz` — same pack as a folder (`sudo ./install`)
+- `requestick-docker.tar.gz` / `requestick-image.tar.gz`
+- `requestick-windows.zip`
+- `requestick-source.tar.gz`
 
 To cut a new pack: `git tag v1.0.2 && git push origin v1.0.2`
-
-A shop that can `docker login` to GHCR can set in `mesh.env`:
-
-```text
-REQUESTICK_IMAGE=ghcr.io/dozer54321/requestick:v1.0.1
-```
-
-Rebuild packs on a machine with Node 22 (and Docker, for the image):
-
-```text
-npm ci
-npm run pack:installers
-```
 
 ## Windows installer (server only)
 
@@ -158,6 +138,3 @@ desks. It needs Administrator and [Docker Desktop](https://www.docker.com/produc
 2. Open **START HERE.txt**
 3. Right-click `install.bat` → **Run as administrator**
 4. When prompted, enter `requestick.yourcompany.com`
-
-If IIS is using the web ports, the installer will offer to stop it. If Docker
-Desktop is already running, `.\start.ps1 your.hostname` is enough.
