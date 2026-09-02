@@ -52,6 +52,16 @@ sudo /opt/requestick/backup.sh
 Keep `mesh.env` (database password and sign-in secret). Do not delete the
 Docker volume `mesh_pgdata`.
 
+If the board goes blank during an update, the app container did not finish
+starting. On the VPS:
+
+```bash
+cd /opt/requestick
+docker rm -f mesh-app-1
+docker compose --env-file mesh.env up -d
+docker compose --env-file mesh.env ps
+```
+
 ## Docker pack
 
 If you already have the files on the machine:

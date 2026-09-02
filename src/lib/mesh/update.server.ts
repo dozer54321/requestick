@@ -194,9 +194,7 @@ export async function loadUpdateStatus(): Promise<UpdateStatus> {
       name: r.name || r.tag_name,
       publishedAt: r.published_at,
       notes: (r.body || "").slice(0, 400),
-      hasImage: r.assets.some(
-        (a) => a.name === "requestick-image.tar.gz" || a.name === "requestick-linux-setup.sh",
-      ),
+      hasImage: r.assets.some((a) => a.name === "requestick-image.tar.gz"),
       cached: cached.has(r.tag_name),
       newer: cmpTag(r.tag_name, current) > 0,
     }));
@@ -285,15 +283,29 @@ export async function applyVersion(tag: string): Promise<UpdateStatus> {
 
     writeJob({ state: "restarting", targetTag: tag, error: null });
 
+    // Recreate the app from a *separate* helper container. If we run compose
+    // from inside the app, stopping the app kills the updater mid-swap.
+    await execFile("docker", ["rm", "-f", "mesh-updater"], { timeout: 15_000 }).catch(() => {});
     const { spawn } = await import("node:child_process");
     const child = spawn(
       "docker",
-      ["compose", "--env-file", "mesh.env", "up", "-d", "--no-deps", "app"],
-      {
-        cwd: dir,
-        detached: true,
-        stdio: "ignore",
-      },
+      [
+        "run",
+        "--rm",
+        "--name",
+        "mesh-updater",
+        "-v",
+        "/var/run/docker.sock:/var/run/docker.sock",
+        "-v",
+        `${dir}:/host/requestick`,
+        "-w",
+        "/host/requestick",
+        `requestick:${tag}`,
+        "sh",
+        "-c",
+        "docker compose --env-file mesh.env up -d --no-deps --force-recreate --remove-orphans app",
+      ],
+      { detached: true, stdio: "ignore" },
     );
     child.unref();
   } catch (err) {
