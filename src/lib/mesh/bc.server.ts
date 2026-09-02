@@ -162,6 +162,9 @@ function lineOutstanding(row: JsonRecord): number {
   return asNumber(row.quantity);
 }
 
+const LINE_SELECT =
+  "$select=id,documentId,lineObjectNumber,number,description,quantity,outstandingQuantity,quantityToShip";
+
 async function fetchLinesForPart(
   secrets: BcSecrets,
   access: string | null,
@@ -169,18 +172,16 @@ async function fetchLinesForPart(
   partNumber: string,
 ): Promise<JsonRecord[]> {
   const quoted = odataQuote(partNumber);
-  const select =
-    "$select=id,documentId,lineObjectNumber,number,description,quantity,outstandingQuantity,quantityToShip";
   const attempts = [
-    `${root}/salesOrderLines?${select}&$filter=lineObjectNumber eq ${quoted} and outstandingQuantity gt 0&$top=200`,
-    `${root}/salesOrderLines?${select}&$filter=number eq ${quoted} and outstandingQuantity gt 0&$top=200`,
-    `${root}/salesOrderLines?${select}&$filter=lineObjectNumber eq ${quoted}&$top=200`,
-    `${root}/salesOrderLines?${select}&$filter=number eq ${quoted}&$top=200`,
+    `${root}/salesOrderLines?${LINE_SELECT}&$top=200&$filter=lineObjectNumber eq ${quoted} and outstandingQuantity gt 0`,
+    `${root}/salesOrderLines?${LINE_SELECT}&$top=200&$filter=number eq ${quoted} and outstandingQuantity gt 0`,
+    `${root}/salesOrderLines?${LINE_SELECT}&$top=200&$filter=lineObjectNumber eq ${quoted}`,
+    `${root}/salesOrderLines?${LINE_SELECT}&$top=200&$filter=number eq ${quoted}`,
   ];
   const wanted = partNumber.toUpperCase();
   for (const path of attempts) {
     try {
-      const rows = await bcListAll(secrets, access, path, 800);
+      const rows = await bcListAll(secrets, access, path, 2000);
       const matched = rows.filter((row) => linePart(row).toUpperCase() === wanted);
       const open = matched.filter((row) => lineOutstanding(row) > 0);
       if (open.length > 0) return open;
@@ -192,6 +193,42 @@ async function fetchLinesForPart(
   return [];
 }
 
+function salespersonFromHeader(row: JsonRecord): string {
+  const nested = (row.salespersonPurchaser || row.salesperson || {}) as JsonRecord;
+  return (
+    asString(row.salespersonCode) ||
+    asString(nested.code) ||
+    asString(nested.number) ||
+    ""
+  );
+}
+
+async function fetchSalespersonCodes(
+  secrets: BcSecrets,
+  access: string | null,
+  root: string,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const paths = [
+    `${root}/salespersonPurchasers?$select=id,code`,
+    `${root}/salespeople?$select=id,code`,
+  ];
+  for (const path of paths) {
+    try {
+      const rows = await bcListAll(secrets, access, path, 400);
+      for (const row of rows) {
+        const id = asString(row.id);
+        const code = asString(row.code);
+        if (id && code) map.set(id.toLowerCase(), code);
+      }
+      if (map.size > 0) return map;
+    } catch {
+      /* try the next entity set */
+    }
+  }
+  return map;
+}
+
 async function fetchOrderHeaders(
   secrets: BcSecrets,
   access: string | null,
@@ -199,32 +236,46 @@ async function fetchOrderHeaders(
   ids: string[],
 ): Promise<Map<string, JsonRecord>> {
   const map = new Map<string, JsonRecord>();
-  const size = 12;
+  const selects = [
+    "$select=id,number,status,salespersonCode,salesperson,fullyShipped",
+    "$select=id,number,status,salesperson,fullyShipped",
+    "$select=id,number,status,fullyShipped",
+  ];
+  const size = 40;
+  let select = selects[0];
   for (let i = 0; i < ids.length; i += size) {
     const chunk = ids.slice(i, i + size);
     const filter = chunk.map((id) => `id eq ${id}`).join(" or ");
-    try {
-      const data = await bcGet<ODataList<JsonRecord>>(
-        secrets,
-        access,
-        `${root}/salesOrders?$select=id,number,status,salespersonCode,fullyShipped&$filter=${encodeURIComponent(filter)}`,
-      );
-      for (const row of data.value ?? []) {
-        const id = asString(row.id);
-        if (id) map.set(id, row);
-      }
-    } catch {
-      for (const id of chunk) {
-        try {
-          const row = await bcGet<JsonRecord>(
-            secrets,
-            access,
-            `${root}/salesOrders(${id})?$select=id,number,status,salespersonCode,fullyShipped`,
-          );
-          map.set(id, row);
-        } catch {
-          /* skip one missing header */
+    let loaded = false;
+    for (const trySelect of selects) {
+      try {
+        const data = await bcGet<ODataList<JsonRecord>>(
+          secrets,
+          access,
+          `${root}/salesOrders?${trySelect}&$filter=${encodeURIComponent(filter)}`,
+        );
+        select = trySelect;
+        for (const row of data.value ?? []) {
+          const id = asString(row.id);
+          if (id) map.set(id, row);
         }
+        loaded = true;
+        break;
+      } catch {
+        /* try a smaller $select */
+      }
+    }
+    if (loaded) continue;
+    for (const id of chunk) {
+      try {
+        const row = await bcGet<JsonRecord>(
+          secrets,
+          access,
+          `${root}/salesOrders(${id})?${select}`,
+        );
+        map.set(id, row);
+      } catch {
+        /* skip one missing header */
       }
     }
   }
@@ -243,7 +294,10 @@ export async function searchOpenOrdersByPart(
   const root = companyPath(secrets);
   const lines = await fetchLinesForPart(secrets, access, root, pn);
   const ids = [...new Set(lines.map((row) => asString(row.documentId)).filter(Boolean))];
-  const headers = ids.length > 0 ? await fetchOrderHeaders(secrets, access, root, ids) : new Map();
+  const [headers, codes] = await Promise.all([
+    ids.length > 0 ? fetchOrderHeaders(secrets, access, root, ids) : Promise.resolve(new Map<string, JsonRecord>()),
+    fetchSalespersonCodes(secrets, access, root),
+  ]);
 
   const qtyByOrder = new Map<string, { outstanding: number; description: string }>();
   for (const row of lines) {
@@ -267,11 +321,13 @@ export async function searchOpenOrdersByPart(
     const status = asString(header.status) || "Open";
     if (CLOSED.has(status.toLowerCase())) continue;
     const qty = qtyByOrder.get(id);
+    const spId = asString(header.salesperson);
     out.push({
       orderId: id,
       orderNumber: asString(header.number),
       status,
-      salespersonCode: asString(header.salespersonCode),
+      salespersonCode:
+        salespersonFromHeader(header) || (spId ? codes.get(spId.toLowerCase()) ?? "" : ""),
       outstanding: qty?.outstanding ?? 0,
       description: qty?.description ?? "",
     });

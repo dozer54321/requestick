@@ -508,7 +508,20 @@ function CentralAdmin({
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-10">
+      {initial?.connected ? (
+        <div className="flex min-h-0 flex-col">
+          <h2 className="text-lg font-semibold tracking-tight">Part search</h2>
+          <p className="mt-1 mb-4 text-sm text-muted">
+            No ticket needed. Open sales orders for one part number — order,
+            salesperson code, status. The list scrolls.
+          </p>
+          <div className="flex h-[min(70vh,36rem)] flex-col rounded-xl bg-surface p-4 shadow-ticket">
+            <BcPartSearch />
+          </div>
+        </div>
+      ) : null}
+
       <form
         className="flex max-w-xl flex-col gap-4"
         onSubmit={(e: FormEvent) => {
@@ -677,19 +690,6 @@ function CentralAdmin({
           ) : null}
         </div>
       </form>
-
-      {initial?.connected ? (
-        <div className="flex min-h-0 flex-col">
-          <h2 className="text-lg font-semibold tracking-tight">Part search</h2>
-          <p className="mt-1 mb-4 text-sm text-muted">
-            No ticket needed. Type a part number to see open sales orders, status,
-            and salesperson code. The list scrolls if there are hundreds.
-          </p>
-          <div className="flex max-h-[min(70vh,32rem)] min-h-[16rem] flex-col">
-            <BcPartSearch />
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

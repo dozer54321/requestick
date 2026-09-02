@@ -695,6 +695,13 @@ function NeedCard({
             </Button>
           ) : null}
 
+          {canLookupBc ? (
+            <Button variant="outline" size="sm" onClick={() => setOrdersOpen(true)}>
+              <ClipboardList className="size-3.5" />
+              Orders
+            </Button>
+          ) : null}
+
           {need.status === "open" ? (
             <>
               <Button

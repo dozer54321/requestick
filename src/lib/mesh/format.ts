@@ -2,7 +2,7 @@ import { format, formatDistanceToNowStrict, isToday, isYesterday, parseISO } fro
 import type { MeshNeed, MeshProfile, NeedPriority, NeedStatus } from "./types";
 
 export function stripPartEdges(value: string): string {
-  return value.replace(/^\s+/, "");
+  return value.replace(/^\s+/, "").replace(/\s+$/g, "");
 }
 
 export function finishPart(value: string): string {

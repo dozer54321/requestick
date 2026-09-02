@@ -25,12 +25,12 @@ export function BcTicketsDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex w-[min(100%-1.5rem,36rem)] max-h-[min(88vh,40rem)] flex-col overflow-hidden">
+      <DialogContent className="flex h-[min(90dvh,48rem)] w-[min(100%-1.5rem,46rem)] flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Open orders</DialogTitle>
           <DialogDescription>
-            Sales orders still open for this part. Order number, salesperson code,
-            status. Customer data is not pulled.
+            Open sales orders for this part only. Sales order number, salesperson
+            code, status. Customer records are not loaded.
           </DialogDescription>
         </DialogHeader>
         <BcPartSearch
@@ -81,7 +81,8 @@ export function BcPartSearch({
       </form>
       {!part ? (
         <p className="text-sm text-muted">
-          Enter a part number. Requestick only asks BC for open orders on that item.
+          Type a part number. No ticket required. Requestick only asks BC for
+          open orders on that item.
         </p>
       ) : orders.isPending ? (
         <p className="text-sm text-muted">Looking up {part}…</p>
@@ -107,40 +108,40 @@ function PartOrderList({ part, orders }: { part: string; orders: BcPartOrder[] }
     );
   }
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <p className="font-mono text-[11px] tracking-wider text-faint uppercase">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <p className="mb-2 font-mono text-[11px] tracking-wider text-faint uppercase">
         {orders.length} open {orders.length === 1 ? "order" : "orders"} · {part}
       </p>
-      <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg bg-surface-2 shadow-[0_0_0_1px_var(--color-line)]">
-        {orders.map((row) => (
-          <li
-            key={row.orderId}
-            className="flex items-baseline justify-between gap-3 border-b border-line px-3 py-2 last:border-b-0"
-          >
-            <div className="min-w-0">
-              <p className="font-mono text-sm font-medium text-ink">
-                {row.orderNumber}
-                {row.salespersonCode ? (
-                  <span className="text-muted"> · {row.salespersonCode}</span>
-                ) : (
-                  <span className="text-faint"> · no salesperson</span>
-                )}
-              </p>
-              {row.description ? (
-                <p className="truncate text-xs text-faint">{row.description}</p>
-              ) : null}
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Badge tone="open">{row.status || "Open"}</Badge>
-              {row.outstanding > 0 ? (
-                <span className="font-mono text-[11px] text-faint tabular-nums">
-                  qty {row.outstanding}
-                </span>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg bg-surface-2 shadow-[0_0_0_1px_var(--color-line)]">
+        <table className="w-full border-collapse text-left">
+          <thead className="sticky top-0 z-10 bg-surface-2">
+            <tr className="border-b border-line font-mono text-[11px] tracking-wider text-faint uppercase">
+              <th className="px-3 py-2 font-medium">Sales order</th>
+              <th className="px-3 py-2 font-medium">Salesperson code</th>
+              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 text-right font-medium">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map((row) => (
+              <tr key={row.orderId} className="border-b border-line last:border-b-0">
+                <td className="px-3 py-2 font-mono text-sm font-medium text-ink">
+                  {row.orderNumber}
+                </td>
+                <td className="px-3 py-2 font-mono text-sm text-ink">
+                  {row.salespersonCode || "—"}
+                </td>
+                <td className="px-3 py-2">
+                  <Badge tone="open">{row.status || "Open"}</Badge>
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-[12px] text-faint tabular-nums">
+                  {row.outstanding > 0 ? row.outstanding : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
