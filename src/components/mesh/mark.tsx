@@ -36,7 +36,7 @@ export function MeshWordmark({ compact = false }: { compact?: boolean }) {
         </span>
         {!compact ? (
           <span className="mt-0.5 font-mono text-[10px] tracking-[0.18em] text-muted uppercase">
-            {brand.tagline || "Sales board"}
+            {brand.tagline || "Request Ticket Tracker"}
           </span>
         ) : null}
       </span>

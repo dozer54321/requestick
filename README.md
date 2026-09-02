@@ -1,6 +1,6 @@
 # Requestick
 
-Company-only sales board for FFL inside sales. Post a part on an open dealer
+Request ticket tracker for FFL inside sales. Post a part on an open dealer
 ticket, ping the desk, call Ring Central or text a cell. Admins approve logins,
 set branding, and can read open tickets from Business Central (read-only).
 

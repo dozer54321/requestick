@@ -224,7 +224,7 @@ function LookAdmin({
             id="brand-tag"
             value={tagline}
             onChange={(e) => setTagline(e.target.value)}
-            placeholder="Sales board"
+            placeholder="Request Ticket Tracker"
           />
         </Field>
         <div className="flex flex-col gap-1.5">
@@ -356,7 +356,7 @@ function LookPreview({ brand }: { brand: Branding }) {
             className="font-mono text-[10px] tracking-[0.18em] uppercase"
             style={{ color: vars["--color-muted"] }}
           >
-            {brand.tagline || "Sales board"}
+            {brand.tagline || "Request Ticket Tracker"}
           </p>
         </div>
       </div>

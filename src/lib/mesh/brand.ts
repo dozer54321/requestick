@@ -2,7 +2,7 @@ import type { Branding, PublicBrand } from "./types";
 
 export const DEFAULT_BRANDING: Branding = {
   companyName: "Requestick",
-  tagline: "Sales board",
+  tagline: "Request Ticket Tracker",
   logoData: "",
   paper: "#efe8dc",
   ink: "#1c1917",

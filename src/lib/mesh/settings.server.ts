@@ -86,7 +86,7 @@ export async function ensureSettings(sql: Sql): Promise<void> {
     create table if not exists mesh_settings (
       id integer primary key check (id = 1),
       company_name text not null default 'Requestick',
-      tagline text not null default 'Sales board',
+      tagline text not null default 'Request Ticket Tracker',
       logo_data text not null default '',
       paper text not null default '#efe8dc',
       ink text not null default '#1c1917',
@@ -112,6 +112,10 @@ export async function ensureSettings(sql: Sql): Promise<void> {
   await sql.query(
     `update mesh_settings set company_name = 'Requestick', updated_at = now()
      where id = 1 and company_name in ('Mesh', '')`,
+  );
+  await sql.query(
+    `update mesh_settings set tagline = 'Request Ticket Tracker', updated_at = now()
+     where id = 1 and tagline in ('Sales board', 'Sales Board', '')`,
   );
   settingsReady = true;
 }

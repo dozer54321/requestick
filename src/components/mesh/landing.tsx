@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Bell, Phone, Search, ShieldCheck } from "lucide-react";
-import { MeshMark } from "./mark";
+import { MeshWordmark } from "./mark";
 import { useBranding } from "./brand-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,12 +44,7 @@ export function Landing() {
   return (
     <div className="min-h-dvh">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
-        <span className="flex items-center gap-2.5">
-          <MeshMark />
-          <span className="font-sans text-lg font-semibold tracking-tight">
-            {brand.companyName}
-          </span>
-        </span>
+        <MeshWordmark />
         <Button asChild variant="outline" size="sm">
           <Link to="/login">Sign in</Link>
         </Button>

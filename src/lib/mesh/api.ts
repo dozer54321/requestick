@@ -271,7 +271,7 @@ function parseBranding(input: Record<string, unknown>): Branding {
   }
   return {
     companyName,
-    tagline: cleanText(input.tagline, 80) || "Sales board",
+    tagline: cleanText(input.tagline, 80) || "Request Ticket Tracker",
     logoData,
     paper,
     ink,
