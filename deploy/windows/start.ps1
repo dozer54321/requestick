@@ -15,11 +15,26 @@ function Fail([string]$Msg) {
 }
 
 if (-not $Domain) {
-  $Domain = Read-Host "Hostname (example: requestick.yourcompany.com)"
+  $hint = ""
+  $envFile = Join-Path $Root "mesh.env"
+  if (Test-Path $envFile) {
+    $line = Select-String -Path $envFile -Pattern '^MESH_DOMAIN=' | Select-Object -Last 1
+    if ($line) { $hint = ($line.Line -replace '^MESH_DOMAIN=', '').Trim().Trim('"').Trim("'") }
+  }
+  if ($hint) {
+    $entered = Read-Host "Domain or subdomain [$hint]"
+    $Domain = if ($entered) { $entered } else { $hint }
+  } else {
+    $Domain = Read-Host "Domain or subdomain (example: tickets.yourshop.com)"
+  }
 }
 $Domain = $Domain.Trim().ToLower()
+$Domain = $Domain -replace '^https?://', ''
+$Domain = ($Domain -split '/')[0]
+$Domain = ($Domain -split ':')[0]
+$Domain = $Domain.TrimEnd('.')
 if (-not $Domain -or $Domain -match "^\d+\.\d+\.\d+\.\d+$") {
-  Fail "Use a real hostname you own. Login will not work on a bare IP."
+  Fail "Use a domain or subdomain you own. Login will not work on a bare IP."
 }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {

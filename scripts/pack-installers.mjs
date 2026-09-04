@@ -161,8 +161,8 @@ execSync(
 const setupPath = join(artifacts, "requestick-linux-setup.sh");
 const setupHeader = `#!/bin/bash
 # Requestick — one-file Linux installer
-# Usage: sudo bash requestick-linux-setup.sh requestick.example.com
-# Piped curl|bash also works: the script copies stdin to a temp file first.
+# Usage: sudo bash requestick-linux-setup.sh
+# It asks for the domain or subdomain. You can still pass one as the first argument.
 set -euo pipefail
 case "\$0" in
   bash|sh|-bash|-sh|dash)
@@ -178,18 +178,8 @@ if [ ! -f "\$0" ]; then
   chmod +x "\$_tmp"
   exec bash "\$_tmp" "\$@"
 fi
-DOMAIN="\${1:-}"
-if [ -z "\$DOMAIN" ]; then
-  echo "Usage: sudo bash requestick-linux-setup.sh requestick.example.com"
-  echo "Use a real hostname you own (a subdomain is fine). Login needs HTTPS."
-  exit 1
-fi
 if [ "\$(id -u)" -ne 0 ]; then
   echo "Re-run with sudo."
-  exit 1
-fi
-if echo "\$DOMAIN" | grep -Eq '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$'; then
-  echo "Use a real hostname you own. Login will not work on a bare IP."
   exit 1
 fi
 DEST="\${REQUESTICK_HOME:-/opt/requestick}"
@@ -216,7 +206,7 @@ if [ -f "\$KEEP/mesh.env" ]; then cp "\$KEEP/mesh.env" "\$DEST/mesh.env"; fi
 if [ -d "\$KEEP/backups" ]; then rm -rf "\$DEST/backups"; cp -a "\$KEEP/backups" "\$DEST/backups"; fi
 cd "\$DEST"
 chmod +x install.sh install backup.sh start.sh 2>/dev/null || chmod +x install.sh backup.sh start.sh
-./install.sh "\$DOMAIN"
+./install.sh "\$@"
 exit 0
 __REQUESTICK_ARCHIVE__
 `;

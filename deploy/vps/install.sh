@@ -1,9 +1,9 @@
 #!/bin/bash
 # Requestick — one-shot install on Ubuntu 22.04 / 24.04
 # Usage:
-#   sudo ./install requestick.yourcompany.com
-#   sudo ./install.sh requestick.yourcompany.com
-# If you omit the hostname, it will ask.
+#   sudo ./install
+#   sudo ./install.sh
+# Optional: pass the domain as the first argument. If omitted, it asks.
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -11,25 +11,57 @@ if [ "$(id -u)" -ne 0 ]; then
   exec sudo -E "$0" "$@"
 fi
 
-DOMAIN="${1:-}"
-if [ -z "$DOMAIN" ]; then
-  if [ -t 0 ] || [ -e /dev/tty ]; then
-    read -r -p "Hostname (example: requestick.yourcompany.com): " DOMAIN < /dev/tty
+normalize_domain() {
+  local d
+  d="$(printf '%s' "$1" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+  d="${d#http://}"
+  d="${d#https://}"
+  d="${d%%/*}"
+  d="${d%%:*}"
+  d="${d%.}"
+  printf '%s' "$d"
+}
+
+ask_domain() {
+  local current="$1"
+  local passed="$2"
+  local input=""
+  if [ -n "$passed" ]; then
+    input="$passed"
+  elif [ -e /dev/tty ]; then
+    if [ -n "$current" ]; then
+      printf "Domain or subdomain [%s]: " "$current" > /dev/tty
+    else
+      printf "Domain or subdomain (example: tickets.yourshop.com): " > /dev/tty
+    fi
+    IFS= read -r input < /dev/tty || true
   fi
-fi
-DOMAIN="$(echo "$DOMAIN" | tr -d '[:space:]')"
-if [ -z "$DOMAIN" ]; then
-  echo "Usage: sudo ./install requestick.yourcompany.com"
-  echo "Use a real hostname you own (a subdomain is fine). Login needs HTTPS, not a bare IP."
-  exit 1
-fi
-if echo "$DOMAIN" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-  echo "Use a real hostname you own. Login will not work on a bare IP."
-  exit 1
-fi
+  normalize_domain "${input:-$current}"
+}
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
+
+EXISTING=""
+if [ -f "$ROOT/mesh.env" ]; then
+  EXISTING="$(grep -E '^MESH_DOMAIN=' "$ROOT/mesh.env" | tail -n1 | cut -d= -f2- | tr -d "\"'")"
+  EXISTING="$(normalize_domain "$EXISTING")"
+fi
+
+DOMAIN="$(ask_domain "$EXISTING" "${1:-}")"
+if [ -z "$DOMAIN" ]; then
+  echo "A domain or subdomain is required. Login needs HTTPS, not a bare IP."
+  exit 1
+fi
+if echo "$DOMAIN" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "Use a hostname, not an IP."
+  exit 1
+fi
+if ! echo "$DOMAIN" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'; then
+  echo "That does not look like a domain or subdomain."
+  exit 1
+fi
+echo "Installing for $DOMAIN"
 
 if [ ! -f "$ROOT/docker-compose.yml" ]; then
   echo "Missing docker-compose.yml. Unpack the full Requestick pack first, then run ./install from that folder."

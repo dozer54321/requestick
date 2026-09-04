@@ -3,24 +3,19 @@ REQUESTICK SETUP (Linux)
 
 One server. Sales desks only open the website.
 
-Install — download the file, then run it (curl, not url). Change the hostname:
+Install — download the file, then run it (curl, not url). It asks for the
+domain or subdomain:
 
   sudo apt-get update && sudo apt-get install -y curl
   curl -fsSL -o /tmp/requestick-install.sh https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh
-  sudo bash /tmp/requestick-install.sh requestick.example.com
+  sudo bash /tmp/requestick-install.sh
 
 Already have this folder:
 
-  sudo ./install requestick.example.com
+  sudo ./install
 
 DNS A record must point at this server. Login needs HTTPS, not a bare IP.
 
-First person to Sign in and fill their desk card is the admin.
+First person to Sign in and fill their desk card is the owner.
 
   Admin → People    add / approve accounts
-  Admin → Look      company name, mark, colors
-  Admin → Central   Business Central, read-only
-  Admin → Updates   GitHub update or revert (manual)
-
-Backup:  sudo ./backup.sh
-Keep mesh.env private.

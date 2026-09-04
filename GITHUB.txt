@@ -1,9 +1,11 @@
 REQUESTICK — GitHub
 ===================
 
-The repo is public so anyone can install with one line (no token):
+The repo is public so anyone can install (no token). It asks for the domain:
 
-  curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.yourcompany.com
+  sudo apt-get update && sudo apt-get install -y curl
+  curl -fsSL -o /tmp/requestick-install.sh https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh
+  sudo bash /tmp/requestick-install.sh
 
 Each shop's BOARD is still company-only: first sign-in is admin, everyone
 else waits for approval. Do not put two shops on one install.

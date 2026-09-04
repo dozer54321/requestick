@@ -1,24 +1,59 @@
 #!/bin/bash
 # Requestick — start the premade Docker stack (Docker already installed).
-# Usage: ./start.sh requestick.yourcompany.com
+# Usage: ./start.sh
+# Optional: pass the domain as the first argument. If omitted, it asks.
 set -euo pipefail
 
-DOMAIN="${1:-}"
-if [ -z "$DOMAIN" ]; then
-  echo "Usage: ./start.sh requestick.yourcompany.com"
-  echo "Use a real hostname you own (a subdomain is fine). Login needs HTTPS."
-  exit 1
-fi
-if echo "$DOMAIN" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-  echo "Use a real hostname you own. Login will not work on a bare IP."
-  exit 1
-fi
+normalize_domain() {
+  local d
+  d="$(printf '%s' "$1" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+  d="${d#http://}"
+  d="${d#https://}"
+  d="${d%%/*}"
+  d="${d%%:*}"
+  d="${d%.}"
+  printf '%s' "$d"
+}
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
+EXISTING=""
+if [ -f "$ROOT/mesh.env" ]; then
+  EXISTING="$(grep -E '^MESH_DOMAIN=' "$ROOT/mesh.env" | tail -n1 | cut -d= -f2- | tr -d "\"'")"
+  EXISTING="$(normalize_domain "$EXISTING")"
+fi
+
+DOMAIN="${1:-}"
+if [ -z "$DOMAIN" ]; then
+  if [ -e /dev/tty ]; then
+    if [ -n "$EXISTING" ]; then
+      printf "Domain or subdomain [%s]: " "$EXISTING" > /dev/tty
+    else
+      printf "Domain or subdomain (example: tickets.yourshop.com): " > /dev/tty
+    fi
+    IFS= read -r DOMAIN < /dev/tty || true
+  fi
+  DOMAIN="$(normalize_domain "${DOMAIN:-$EXISTING}")"
+else
+  DOMAIN="$(normalize_domain "$DOMAIN")"
+fi
+
+if [ -z "$DOMAIN" ]; then
+  echo "A domain or subdomain is required. Login needs HTTPS, not a bare IP."
+  exit 1
+fi
+if echo "$DOMAIN" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "Use a hostname, not an IP."
+  exit 1
+fi
+if ! echo "$DOMAIN" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'; then
+  echo "That does not look like a domain or subdomain."
+  exit 1
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker is not installed. On Ubuntu, run:  sudo ./install.sh $DOMAIN"
+  echo "Docker is not installed. On Ubuntu, run:  sudo ./install.sh"
   echo "Or install Docker Desktop, then re-run this script."
   exit 1
 fi

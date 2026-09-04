@@ -2,15 +2,15 @@ REQUESTICK — Ubuntu VPS
 =======================
 
 Point DNS first. Use curl (not url). Download the file, then run it.
-Change the hostname on the last line.
+It asks for the domain or subdomain.
 
 sudo apt-get update && sudo apt-get install -y curl
 curl -fsSL -o /tmp/requestick-install.sh https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh
-sudo bash /tmp/requestick-install.sh requestick.example.com
+sudo bash /tmp/requestick-install.sh
 
 Already unpacked:
 
-  sudo ./install requestick.example.com
+  sudo ./install
 
 After install: Admin → Updates to pull a newer GitHub release or revert.
 Manual only.

@@ -1,18 +1,21 @@
 REQUESTICK — run it on your own Ubuntu server
 ============================================
 
-One line (change the hostname). No GitHub token.
+Download the installer, then run it. It asks for the domain or subdomain.
+No GitHub token.
 
-  curl -fsSL https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh | sudo bash -s -- requestick.yourcompany.com
+  sudo apt-get update && sudo apt-get install -y curl
+  curl -fsSL -o /tmp/requestick-install.sh https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh
+  sudo bash /tmp/requestick-install.sh
 
 Already unpacked:
 
-  sudo ./install requestick.yourcompany.com
+  sudo ./install
 
 Need a hostname (not a bare IP) and a DNS A record pointing at this server.
 
-Open https://requestick.yourcompany.com
-First person through Sign in + desk card is the admin.
+Open https://your-domain
+First person through Sign in + desk card is the owner.
 
 Backup:  sudo ./backup.sh
 Keep mesh.env. Do not delete the Docker volume mesh_pgdata.

@@ -16,23 +16,23 @@ are optional.
 Point DNS at the server first (A record → this machine). Login needs a real
 hostname and HTTPS, not a bare IP.
 
-On the Ubuntu VPS, paste all three lines. Change the hostname on the last line.
-The download command is **`curl`** (not `url`). Save the installer to a file,
-then run it — do not pipe it into bash.
+On the Ubuntu VPS, paste these three lines. The download command is **`curl`**
+(not `url`). Save the installer, then run it — it asks for the domain or
+subdomain.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y curl
 curl -fsSL -o /tmp/requestick-install.sh https://github.com/dozer54321/requestick/releases/latest/download/requestick-linux-setup.sh
-sudo bash /tmp/requestick-install.sh requestick.example.com
+sudo bash /tmp/requestick-install.sh
 ```
 
-Wait about a minute, then open `https://requestick.example.com`. First person
-through Sign in + desk card is the admin.
+Wait about a minute, then open `https://` your domain. First person through
+Sign in + desk card is the owner.
 
 Already unpacked:
 
 ```bash
-sudo ./install requestick.example.com
+sudo ./install
 ```
 
 Sales use Chrome or Edge. Nothing is installed on the desks.
@@ -86,10 +86,10 @@ If you already have the files on the machine:
 tar -xzf requestick-docker.tar.gz
 cd requestick-docker
 chmod +x start.sh backup.sh
-./start.sh requestick.example.com
+./start.sh
 ```
 
-Windows host (Docker Desktop): `.\start.ps1 requestick.example.com`
+Windows host (Docker Desktop): `.\start.ps1`
 
 Drop `requestick-image.tar.gz` next to `docker-compose.yml` and start will load
 it instead of building.
