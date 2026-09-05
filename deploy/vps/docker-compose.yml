@@ -1,9 +1,9 @@
 name: mesh
 
 # Premade stack: Postgres + Requestick + Caddy (HTTPS).
-#   ./start.sh requestick.yourcompany.com
-# Optional prebuilt image (GitHub Release):
-#   REQUESTICK_IMAGE=ghcr.io/YOURORG/requestick:v1.0.0
+#   ./start.sh
+# If Caddy is already on the host, start.sh piggybacks on it and does not
+# start this Caddy container. Otherwise Caddy runs here as usual.
 
 services:
   db:

@@ -44,7 +44,12 @@ Or after you tag a release on GitHub:
   REQUESTICK_IMAGE=ghcr.io/YOURORG/requestick:v1.0.0
   docker compose --env-file mesh.env up -d
 
-Already have a reverse proxy?
+Already have Caddy on the machine?
+---------------------------------
+start.sh detects a host Caddy binary and adds the site to
+/etc/caddy/Caddyfile (127.0.0.1:3000). The Caddy container is not started.
+
+Already have a different reverse proxy?
 -----------------------------
 In docker-compose.yml, comment out the caddy service and uncomment
 the app ports (127.0.0.1:3000). Point your proxy at that.

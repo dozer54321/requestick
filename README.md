@@ -37,6 +37,11 @@ sudo ./install
 
 Sales use Chrome or Edge. Nothing is installed on the desks.
 
+If **Caddy is already installed** on the VPS, install hooks that copy (site
+block in `/etc/caddy/Caddyfile`, app on `127.0.0.1:3000`) and does not start
+a second Caddy. If Caddy is not on the host, Requestick runs it in Docker
+as before.
+
 ## Admin
 
 1. **People** — add accounts or approve sign-ups. The first login is the

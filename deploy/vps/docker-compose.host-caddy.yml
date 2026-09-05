@@ -1,0 +1,10 @@
+# Used when Caddy is already installed on the host.
+# Merged on top of docker-compose.yml: app is published on localhost,
+# bundled Caddy is not started (profile keeps it off).
+services:
+  app:
+    ports:
+      - "127.0.0.1:${REQUESTICK_APP_PORT:-3000}:3000"
+  caddy:
+    profiles:
+      - requestick-bundled-caddy

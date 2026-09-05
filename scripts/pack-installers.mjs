@@ -39,7 +39,7 @@ mkdirSync(artifacts, { recursive: true });
 
 function copyCommon(dest) {
   mkdirSync(dest, { recursive: true });
-  for (const f of ["Dockerfile", "docker-compose.yml", "Caddyfile", "env.example"]) {
+  for (const f of ["Dockerfile", "docker-compose.yml", "docker-compose.host-caddy.yml", "Caddyfile", "env.example"]) {
     const src = join(root, "deploy/vps", f);
     if (existsSync(src)) cpSync(src, join(dest, f));
   }
